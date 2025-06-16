@@ -13,6 +13,12 @@ return new class extends Migration
     {
         Schema::create('tickets', function (Blueprint $table) {
             $table->id();
+            $table->string('ticket_number')->unique();
+            $table->decimal('price', 8, 2);
+            $table->enum('status', ['available', 'sold', 'reserved'])->default('available');
+            $table->dateTime('purchase_date')->nullable();
+            $table->foreignId('event_id')->constrained()->onDelete('cascade');
+            $table->foreignId('user_id')->nullable()->constrained()->onDelete('set null');
             $table->timestamps();
         });
     }

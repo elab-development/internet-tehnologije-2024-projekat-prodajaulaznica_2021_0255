@@ -1,61 +1,151 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# 🎫 Laravel - Sistem za rezervaciju ulaznica
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+**Prvi domaći zadatak** je sistem za upravljanje događajima i rezervaciju ulaznica, razvijen u **Laravel** framework-u. Aplikacija nudi RESTful API za mobilne i frontend aplikacije, kao i web interfejs za pregled i upravljanje.
 
-## About Laravel
+---
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+### 📋 Pregled projekta
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+- **RESTful API**: Kompletne CRUD operacije za događaje, kategorije i ulaznice
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+- **Web interfejs**: Pregled događaja sa paginacijom, filtriranjem i sortiranjem
 
-## Learning Laravel
+- **Autentifikacija**: Bezbedna prijava korisnika putem Laravel Sanctum-a
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+- **Upravljanje sadržajem**: Lako dodavanje i organizacija događaja po kategorijama
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+- **Rezervacije**: Sistem za kupovinu ulaznica sa podrškom za popuste
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+- **Validacija**: QR kodovi za brzu i laku validaciju ulaznica
 
-## Laravel Sponsors
+---
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+### 🏗️ Struktura baze podataka
+| Tabela       | Opis                                      | Relacije                                           |
+|--------------|-------------------------------------------|----------------------------------------------------|
+| `users`      | Registrovani korisnici sistema            | `User` ima više `Ticket`-a                         |
+| `categories` | Kategorije događaja (muzika, sport...)    | `Category` ima više `Event`-a                      |
+| `events`     | Događaji sa detaljima, cenama i slikama   | `Event` ima više `Ticket`-a, pripada `Category`    |
+| `tickets`    | Rezervisane/kupljene ulaznice             | `Ticket` pripada `User`-u i `Event`-u              |
+---
 
-### Premium Partners
+### 🛠️ Tehnologije
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+- **Backend**: Laravel 12
 
-## Contributing
+- **Baza podataka**: MySQL
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+- **Autentifikacija**: Laravel Sanctum
 
-## Code of Conduct
+- **Frontend**: Blade Templates & Bootstrap 5
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+- **Testiranje**: Postman
 
-## Security Vulnerabilities
+- **Version Control**: Git
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+---
 
-## License
+### 🚀 Instalacija
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+```bash
+
+# 1. Kloniraj repozitorijum
+
+git clone https://github.com/elab-development/internet-tehnologije-2024-projekat-prodajaulaznica_2021_0255
+cd laravelDomaci
+
+# 2. Instaliraj zavisnosti
+
+composer install
+
+# 3. Podesi okruženje
+
+cp .env.example .env
+
+php artisan key:generate
+
+# 4. Postavi bazu podataka i popuni je
+
+php artisan migrate:fresh --seed
+
+# 5. Pokreni server
+
+php artisan serve
+
+```
+
+---
+
+### 📡 API Endpoints
+#### Autentifikacija
+| Metoda | Endpoint         | Opis                  | Auth |
+|--------|------------------|-----------------------|------|
+| POST   | `/api/register`  | Registracija korisnika| ❌   |
+| POST   | `/api/login`     | Prijava              | ❌   |
+| POST   | `/api/logout`    | Odjava               | ✔️   |
+
+#### Događaji (`/api/events`)
+| Metoda | Endpoint              | Opis                         | Auth |
+|--------|-----------------------|------------------------------|------|
+| GET    | `/`                   | Lista događaja (paginacija)  | ❌   |
+| GET    | `/{id}`               | Detalji događaja             | ❌   |
+| POST   | `/`                   | Kreiranje novog događaja     | ✔️   |
+| PUT    | `/{id}`               | Ažuriranje događaja          | ✔️   |
+| DELETE | `/{id}`               | Brisanje događaja            | ✔️   |
+| GET    | `/category/{id}`      | Događaji po kategoriji       | ❌   |
+| GET    | `/{id}/tickets`       | Ulaznice za događaj          | ❌   |
+
+#### Kategorije (`/api/categories`)
+| Metoda | Endpoint  | Opis                  | Auth |
+|--------|-----------|-----------------------|------|
+| GET    | `/`       | Lista kategorija      | ❌   |
+| GET    | `/{id}`   | Detalji kategorije    | ❌   |
+| POST   | `/`       | Kreiranje kategorije  | ✔️   |
+| PUT    | `/{id}`   | Ažuriranje kategorije | ✔️   |
+| DELETE | `/{id}`   | Brisanje kategorije   | ✔️   |
+
+#### Ulaznice (`/api/tickets`)
+| Metoda | Endpoint            | Opis                     | Auth |
+|--------|---------------------|--------------------------|------|
+| POST   | `/purchase`         | Kupovina ulaznice        | ✔️   |
+| GET    | `/my`               | Moje ulaznice            | ✔️   |
+| GET    | `/{id}`             | Detalji ulaznice         | ✔️   |
+| PATCH  | `/{id}/cancel`      | Otkazivanje ulaznice     | ✔️   |
+| GET    | `/validate/{number}`| Validacija ulaznice      | ❌   |
+
+---
+
+### 🌐 Web Interface
+Javne stranice omogućavaju pregled događaja i kategorija sa naprednim filtriranjem, sortiranjem i paginacijom:
+- `/` - Početna stranica
+- `/events` - Lista svih događaja
+- `/categories` - Lista kategorija
+
+---
+
+### 🎯 Ključne funkcionalnosti
+- **API**: 
+  - JWT Autentifikacija (Sanctum)
+  - Resource kontroleri
+  - JSON odgovori sa validacijom
+  - Generisanje QR kodova
+- **Web**:
+  - Responsive dizajn (Bootstrap 5)
+  - Napredna paginacija
+  - Multi-filter pretraga
+  - Dinamičko sortiranje
+- **Poslovna logika**:
+  - Automatsko upravljanje zalihama ulaznica
+  - Sistem popusta
+  - Praćenje statusa događaja
+  - Validacija ulaznica
+
+---
+
+### 📄 Licenca
+```text
+
+Razvili: Tamara Sarajlija 2021/0255, Jovana Stajčić 2021/0245.
+Fakultet Organizacionih nauka, Internet tehnologije
+
+```

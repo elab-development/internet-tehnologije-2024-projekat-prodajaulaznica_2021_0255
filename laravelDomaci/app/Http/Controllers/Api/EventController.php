@@ -6,42 +6,65 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Event;
 use App\Models\Category;
+use Illuminate\Http\JsonResponse;
 
 class EventController extends Controller
 {
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request): JsonResponse
     {
-        $events = Event::with('category')->get();
+        $query = Event::with('category');
+        
+        // Filtriranje po kategoriji
+        if ($request->has('category_id')) {
+            $query->where('category_id', $request->category_id);
+        }
+        
+        // Filtriranje po dostupnosti ulaznica
+        if ($request->has('available_only') && $request->available_only) {
+            $query->where('available_tickets', '>', 0);
+        }
+        
+        // Sortiranje po datumu početka
+        $events = $query->orderBy('start_date', 'asc')->paginate(15);
+        
         return response()->json($events);
-    }
-
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
-    {
-        //
     }
 
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse
     {
         $request->validate([
-            'title' => 'required|string|max:255',
+            'name' => 'required|string|max:255',
             'description' => 'required|string',
-            'event_date' => 'required|date|after:now',
+            'image_url' => 'nullable|url',
+            'thumbnail_url' => 'nullable|url',
+            'start_date' => 'required|date|after:now',
+            'end_date' => 'required|date|after:start_date',
             'location' => 'required|string|max:255',
-            'ticket_price' => 'required|numeric|min:0',
-            'available_tickets' => 'required|integer|min:1',
+            'price' => 'required|numeric|min:0',
+            'total_tickets' => 'required|integer|min:1',
             'category_id' => 'required|exists:categories,id'
         ]);
 
-        $event = Event::create($request->all());
+        $event = Event::create([
+            'name' => $request->name,
+            'description' => $request->description,
+            'image_url' => $request->image_url,
+            'thumbnail_url' => $request->thumbnail_url,
+            'start_date' => $request->start_date,
+            'end_date' => $request->end_date,
+            'location' => $request->location,
+            'price' => $request->price,
+            'total_tickets' => $request->total_tickets,
+            'available_tickets' => $request->total_tickets, // inicijalno svi su dostupni
+            'category_id' => $request->category_id
+        ]);
+
         $event->load('category');
 
         return response()->json([
@@ -53,38 +76,39 @@ class EventController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(string $id)
+    public function show(string $id): JsonResponse
     {
         $event = Event::with('category')->findOrFail($id);
         return response()->json($event);
     }
 
     /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
-    {
-        //
-    }
-
-    /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, string $id)
+    public function update(Request $request, string $id): JsonResponse
     {
         $event = Event::findOrFail($id);
 
         $request->validate([
-            'title' => 'sometimes|required|string|max:255',
-            'description' => 'sometimes|required|string',
-            'event_date' => 'sometimes|required|date|after:now',
-            'location' => 'sometimes|required|string|max:255',
-            'ticket_price' => 'sometimes|required|numeric|min:0',
-            'available_tickets' => 'sometimes|required|integer|min:1',
-            'category_id' => 'sometimes|required|exists:categories,id'
+            'name' => 'sometimes|string|max:255',
+            'description' => 'sometimes|string',
+            'image_url' => 'nullable|url',
+            'thumbnail_url' => 'nullable|url',
+            'start_date' => 'sometimes|date',
+            'end_date' => 'sometimes|date|after:start_date',
+            'location' => 'sometimes|string|max:255',
+            'price' => 'sometimes|numeric|min:0',
+            'total_tickets' => 'sometimes|integer|min:1',
+            'category_id' => 'sometimes|exists:categories,id'
         ]);
 
-        $event->update($request->all());
+        // Samo ažurirati polja koja postoje u bazi
+        $event->update($request->only([
+            'name', 'description', 'image_url', 'thumbnail_url',
+            'start_date', 'end_date', 'location', 'price',
+            'total_tickets', 'category_id'
+        ]));
+
         $event->load('category');
 
         return response()->json([
@@ -96,9 +120,17 @@ class EventController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(string $id)
+    public function destroy(string $id): JsonResponse
     {
         $event = Event::findOrFail($id);
+        
+        // Proveriti da li postoje prodane ulaznice
+        if ($event->tickets()->count() > 0) {
+            return response()->json([
+                'message' => 'Cannot delete event with sold tickets'
+            ], 422);
+        }
+        
         $event->delete();
 
         return response()->json([
@@ -107,10 +139,13 @@ class EventController extends Controller
     }
 
     // Dodatne rute
-    public function getEventsByCategory($categorySlug)
+    public function getEventsByCategory($categoryId): JsonResponse
     {
-        $category = Category::where('slug', $categorySlug)->firstOrFail();
-        $events = Event::where('category_id', $category->id)->with('category')->get();
+        $category = Category::findOrFail($categoryId);
+        $events = Event::where('category_id', $category->id)
+                      ->with('category')
+                      ->orderBy('start_date', 'asc')
+                      ->get();
 
         return response()->json([
             'category' => $category,
@@ -118,15 +153,15 @@ class EventController extends Controller
         ]);
     }
 
-    public function getEventTickets($id)
+    public function getEventTickets($id): JsonResponse
     {
         $event = Event::with(['tickets.user'])->findOrFail($id);
 
         return response()->json([
-            'event' => $event->only(['id', 'title', 'event_date']),
-            'total_tickets' => $event->available_tickets,
+            'event' => $event->only(['id', 'name', 'start_date', 'end_date']),
+            'total_tickets' => $event->total_tickets,
             'sold_tickets' => $event->sold_tickets,
-            'remaining_tickets' => $event->remaining_tickets,
+            'available_tickets' => $event->available_tickets,
             'tickets' => $event->tickets
         ]);
     }

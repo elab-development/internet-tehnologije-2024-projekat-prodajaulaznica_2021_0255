@@ -14,12 +14,16 @@ Route::post('/login', [AuthController::class, 'login']);
 // Javni pristup događajima (čitanje)
 Route::get('/events', [EventController::class, 'index']);
 Route::get('/events/{id}', [EventController::class, 'show']);
-Route::get('/events/category/{category}', [EventController::class, 'getEventsByCategory']);
+Route::get('/events/category/{categoryId}', [EventController::class, 'getEventsByCategory']);
 Route::get('/events/{id}/tickets', [EventController::class, 'getEventTickets']);
 
 // Javni pristup kategorijama
 Route::get('/categories', [CategoryController::class, 'index']);
 Route::get('/categories/{id}', [CategoryController::class, 'show']);
+Route::get('/categories/{id}/events', [CategoryController::class, 'getEvents']); 
+
+// Javni pristup ulaznicama
+Route::get('/tickets/validate/{ticketNumber}', [TicketController::class, 'validate']); 
 
 // Zaštićene rute (potrebna autentifikacija)
 Route::middleware('auth:sanctum')->group(function () {
@@ -28,9 +32,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     
     // Resource rute za događaje (CRUD) - samo za autentifikovane
-    Route::post('/events', [EventController::class, 'store']);
-    Route::put('/events/{id}', [EventController::class, 'update']);
-    Route::delete('/events/{id}', [EventController::class, 'destroy']);
+    Route::post('/categories', [CategoryController::class, 'store']);
+    Route::put('/categories/{id}', [CategoryController::class, 'update']);
+    Route::delete('/categories/{id}', [CategoryController::class, 'destroy']);
     
     // Kategorije - kreiranje samo za autentifikovane
     Route::post('/categories', [CategoryController::class, 'store']);
@@ -39,6 +43,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/tickets/purchase', [TicketController::class, 'purchaseTicket']);
     Route::get('/tickets/my', [TicketController::class, 'myTickets']);
     Route::get('/tickets/{id}', [TicketController::class, 'show']);
+    Route::patch('/tickets/{id}/cancel', [TicketController::class, 'cancel']);
+    Route::patch('/tickets/{id}/use', [TicketController::class, 'markAsUsed']); 
     
     // Test ruta za proveru autentifikacije
     Route::get('/user', function (Request $request) {

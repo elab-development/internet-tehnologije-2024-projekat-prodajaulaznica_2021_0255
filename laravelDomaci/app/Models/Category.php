@@ -12,12 +12,23 @@ class Category extends Model
     protected $fillable = [
         'name',
         'description',
-        'slug'
+        'color'  // umesto 'slug'
     ];
 
     // Relacije
     public function events()
     {
         return $this->hasMany(Event::class);
+    }
+
+    // Dodatne metode
+    public function getActiveEventsAttribute()
+    {
+        return $this->events()->where('end_date', '>', now())->count();
+    }
+
+    public function hasEvents()
+    {
+        return $this->events()->count() > 0;
     }
 }

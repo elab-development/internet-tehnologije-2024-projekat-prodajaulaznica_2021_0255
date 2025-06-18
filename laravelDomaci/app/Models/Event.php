@@ -10,18 +10,23 @@ class Event extends Model
     use HasFactory;
 
     protected $fillable = [
-        'title',
+        'name',
         'description',
-        'event_date',
+        'image_url',
+        'thumbnail_url',
+        'start_date',
+        'end_date',
         'location',
-        'ticket_price',
+        'price',
+        'total_tickets',
         'available_tickets',
         'category_id'
     ];
 
     protected $casts = [
-        'event_date' => 'datetime',
-        'ticket_price' => 'decimal:2'
+        'start_date' => 'datetime',
+        'end_date' => 'datetime',
+        'price' => 'decimal:2'
     ];
 
     // Relacije
@@ -38,16 +43,23 @@ class Event extends Model
     // Dodatne metode
     public function getSoldTicketsAttribute()
     {
-        return $this->tickets()->count();
-    }
-
-    public function getRemainingTicketsAttribute()
-    {
-        return $this->available_tickets - $this->sold_tickets;
+        return $this->total_tickets - $this->available_tickets;
     }
 
     public function hasAvailableTickets()
     {
-        return $this->remaining_tickets > 0;
+        return $this->available_tickets > 0;
+    }
+
+    // Proveriti da li je događaj aktivan (nije završen)
+    public function isActive()
+    {
+        return $this->end_date > now();
+    }
+
+    // Proveriti da li se mogu kupovati ulaznice (još nije počeo)
+    public function canPurchaseTickets()
+    {
+        return $this->start_date > now() && $this->hasAvailableTickets();
     }
 }

@@ -18,7 +18,7 @@ class CategoryController extends Controller
     public function store(Request $request): JsonResponse
     {
         $request->validate([
-            'name' => 'required|string|max:255|unique:categories',
+            'name' => 'required|string|max:255',
             'description' => 'required|string',
             'color' => 'required|string|max:7|regex:/^#[0-9A-Fa-f]{6}$/' // hex color format
         ]);

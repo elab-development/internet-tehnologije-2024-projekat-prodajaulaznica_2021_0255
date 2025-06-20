@@ -132,9 +132,7 @@ class TicketController extends Controller
             ], 404);
         }
 
-        $isValid = $ticket->status === 'active' && 
-                  $ticket->event->start_date <= now() &&
-                  $ticket->event->end_date > now();
+        $isValid = $ticket->status === 'active';
 
         return response()->json([
             'valid' => $isValid,

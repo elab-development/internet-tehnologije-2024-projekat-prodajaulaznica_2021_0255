@@ -43,12 +43,12 @@ class EventController extends Controller
             'description' => 'required|string',
             'image_url' => 'nullable|url',
             'thumbnail_url' => 'nullable|url',
-            'start_date' => 'required|date|after:now',
-            'end_date' => 'required|date|after:start_date',
+            'start_date' => 'required|date',
+            'end_date' => 'required|date',
             'location' => 'required|string|max:255',
             'price' => 'required|numeric|min:0',
             'total_tickets' => 'required|integer|min:1',
-            'category_id' => 'required|exists:categories,id'
+            'category_id' => 'required'
         ]);
 
         $event = Event::create([
@@ -76,9 +76,17 @@ class EventController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(string $id): JsonResponse
+    public function show($id): JsonResponse
     {
         $event = Event::with('category')->findOrFail($id);
+
+        if (!$event) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Event not found'
+            ]);
+        }
+
         return response()->json($event);
     }
 

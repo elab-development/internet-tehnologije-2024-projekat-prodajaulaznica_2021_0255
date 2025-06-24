@@ -129,7 +129,7 @@
                             
                             <div class="d-flex justify-content-between align-items-center">
                                 <strong class="text-primary">{{ number_format($event->price, 0, ',', '.') }} RSD</strong>
-                                <a href="{{ route('events.show', $event->id) }}" class="btn btn-outline-primary btn-sm">
+                                <a href="#" class="btn btn-outline-primary btn-sm">
                                     Detalji <i class="fas fa-arrow-right"></i>
                                 </a>
                             </div>

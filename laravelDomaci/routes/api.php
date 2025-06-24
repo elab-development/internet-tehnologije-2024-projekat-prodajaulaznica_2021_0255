@@ -53,13 +53,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/tickets/{id}/cancel', [TicketController::class, 'cancel']);
     Route::patch('/tickets/{id}/use', [TicketController::class, 'markAsUsed']);
    
-    // Test ruta za proveru autentifikacije
-    Route::get('/user', function (Request $request) {
-        return response()->json([
-            'user' => $request->user(),
-            'message' => 'Authenticated successfully'
-        ]);
-    });
 });
 
 

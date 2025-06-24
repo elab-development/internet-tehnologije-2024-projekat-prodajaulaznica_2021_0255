@@ -66,22 +66,4 @@ class WebController extends Controller
         
         return view('events.show', compact('event', 'relatedEvents'));
     }
-
-    public function categories()
-    {
-        $categories = Category::withCount('events')->paginate(8);
-        
-        return view('categories.index', compact('categories'));
-    }
-
-    public function categoryEvents($id, Request $request)
-    {
-        $category = Category::findOrFail($id);
-        $events = Event::where('category_id', $id)
-                      ->with('category')
-                      ->orderBy('start_date', 'asc')
-                      ->paginate(9);
-        
-        return view('categories.events', compact('category', 'events'));
-    }
 }

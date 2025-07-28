@@ -1,56 +1,60 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
+import EventCard from "../../components/common/EventCard";
 import Button from "../../components/common/Button";
+import { apiService } from "../../services/api";
 
 const HomePage = () => {
-  const handleClick = (message) => {
-    alert(message);
-  };
+  const [featuredEvents, setFeaturedEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const loadFeaturedEvents = async () => {
+      try {
+        setLoading(true);
+        const response = await apiService.getFeaturedEvents();
+        setFeaturedEvents(response.data);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadFeaturedEvents();
+  }, []);
+
+  if (loading) {
+    return <div className="loading">Učitavanje popularnih događaja...</div>;
+  }
+
+  if (error) {
+    return <div className="error">Greška: {error}</div>;
+  }
 
   return (
     <div>
-      <h2>Dobrodošli na TicketMaster Pro! 🎫</h2>
-      <p>Pronađite i kupite karte za najbolje događaje u gradu.</p>
-
       <div
-        style={{
-          marginTop: "2rem",
-          display: "flex",
-          gap: "1rem",
-          flexWrap: "wrap",
-        }}
+        className="hero-section"
+        style={{ textAlign: "center", marginBottom: "3rem" }}
       >
-        <Button onClick={() => handleClick("Primary button!")}>
-          Kupi karte
+        <h1>Dobrodošli na TicketMaster Pro! 🎫</h1>
+        <p style={{ fontSize: "1.2rem", color: "#666", marginBottom: "2rem" }}>
+          Pronađite i kupite karte za najbolje događaje u gradu
+        </p>
+        <Button size="large" onClick={() => (window.location.href = "/events")}>
+          Pogledaj sve događaje
         </Button>
-
-        <Button
-          variant="secondary"
-          onClick={() => handleClick("Secondary button!")}
-        >
-          Saznaj više
-        </Button>
-
-        <Button
-          variant="outline"
-          onClick={() => handleClick("Outline button!")}
-        >
-          Kontakt
-        </Button>
-
-        <Button
-          variant="success"
-          size="small"
-          onClick={() => handleClick("Success button!")}
-        >
-          ✓ Uspešno
-        </Button>
-
-        <Button variant="danger" loading={true}>
-          Loading...
-        </Button>
-
-        <Button disabled={true}>Disabled</Button>
       </div>
+
+      <section>
+        <h2>🌟 Popularni događaji</h2>
+        <div className="events-grid">
+          {featuredEvents.map((event) => (
+            <EventCard key={event.id} event={event} />
+          ))}
+        </div>
+      </section>
     </div>
   );
 };

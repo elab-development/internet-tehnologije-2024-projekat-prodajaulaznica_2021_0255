@@ -1,6 +1,7 @@
 import React, { useContext } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { CartContext } from "../../context/CartContext";
+import "./Header.css";
 
 const Header = () => {
   const { cartItems } = useContext(CartContext);
@@ -19,7 +20,7 @@ const Header = () => {
     <header className="header">
       <div className="header-container">
         <Link to="/" className="logo">
-          <h1>🎫 TicketMaster </h1>
+          <h1>🎫 TicketMaster Pro</h1>
         </Link>
 
         <nav className="navigation">

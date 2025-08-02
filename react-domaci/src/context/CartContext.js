@@ -1,26 +1,13 @@
-import React, { createContext, useState, useEffect } from "react";
+import React, { createContext, useContext } from "react";
+import useLocalStorage from "../hooks/useLocalStorage";
 
 export const CartContext = createContext();
 
 export const CartProvider = ({ children }) => {
-  const [cartItems, setCartItems] = useState([]);
-
-  // Učitaj korpu iz localStorage prilikom pokretanja
-  useEffect(() => {
-    const savedCart = localStorage.getItem("ticketmaster-cart");
-    if (savedCart) {
-      try {
-        setCartItems(JSON.parse(savedCart));
-      } catch (error) {
-        console.error("Greška pri učitavanju korpe:", error);
-      }
-    }
-  }, []);
-
-  // Sačuvaj korpu u localStorage kad god se promeni
-  useEffect(() => {
-    localStorage.setItem("ticketmaster-cart", JSON.stringify(cartItems));
-  }, [cartItems]);
+  const [cartItems, setCartItems, removeCartItems] = useLocalStorage(
+    "ticketmaster-cart",
+    []
+  );
 
   // Dodaj u korpu
   const addToCart = (item) => {
@@ -33,12 +20,15 @@ export const CartProvider = ({ children }) => {
         // Ako već postoji, povećaj količinu
         return prevItems.map((cartItem) =>
           cartItem.id === item.id
-            ? { ...cartItem, quantity: cartItem.quantity + 1 }
+            ? {
+                ...cartItem,
+                quantity: cartItem.quantity + (item.quantity || 1),
+              }
             : cartItem
         );
       } else {
         // Dodaj novi item
-        return [...prevItems, { ...item, quantity: 1 }];
+        return [...prevItems, { ...item, quantity: item.quantity || 1 }];
       }
     });
   };
@@ -64,7 +54,7 @@ export const CartProvider = ({ children }) => {
 
   // Očisti korpu
   const clearCart = () => {
-    setCartItems([]);
+    removeCartItems();
   };
 
   // Izračunaj ukupnu cenu
@@ -80,6 +70,17 @@ export const CartProvider = ({ children }) => {
     return cartItems.reduce((total, item) => total + item.quantity, 0);
   };
 
+  // Proveri da li je proizvod u korpi
+  const isInCart = (itemId) => {
+    return cartItems.some((item) => item.id === itemId);
+  };
+
+  // Dobij količinu proizvoda u korpi
+  const getItemQuantity = (itemId) => {
+    const item = cartItems.find((item) => item.id === itemId);
+    return item ? item.quantity : 0;
+  };
+
   const contextValue = {
     cartItems,
     addToCart,
@@ -88,9 +89,20 @@ export const CartProvider = ({ children }) => {
     clearCart,
     getTotalPrice,
     getTotalItems,
+    isInCart,
+    getItemQuantity,
   };
 
   return (
     <CartContext.Provider value={contextValue}>{children}</CartContext.Provider>
   );
+};
+
+// Custom hook za lakše korišćenje CartContext
+export const useCart = () => {
+  const context = useContext(CartContext);
+  if (!context) {
+    throw new Error("useCart must be used within a CartProvider");
+  }
+  return context;
 };

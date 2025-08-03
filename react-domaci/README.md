@@ -1,70 +1,168 @@
-# Getting Started with Create React App
+# 🎫 React - Aplikacija za prodaju karata
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Drugi domaći zadatak je moderna React aplikacija za pretraživanje i kupovinu ulaznica za različite događaje. Aplikacija nudi intuitivno korisničko iskustvo sa naprednim filtriranjem, responsivnim dizajnom i state management-om.
 
-## Available Scripts
+## 📋 Pregled projekta
 
-In the project directory, you can run:
+🔍  **Napredna pretraga**: Real-time pretraga događaja sa debounce optimizacijom.
 
-### `npm start`
+📱  **Responsive dizajn**: Potpuno prilagođen svim uređajima (mobile-first pristup).
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+🛒  **Korpa sa localStorage**: Perzistentno čuvanje stavki između sesija.
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+🧩  **Reusable komponente**: Modularna arhitektura sa 7 komponenti za ponovnu upotrebu.
 
-### `npm test`
+🎯  **Custom Hooks**: Napredne funkcionalnosti (useDebounce, useLocalStorage, useCart)
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+🗂️  **Hijerarhijska navigacija**: Breadcrumbs sistem za laku navigaciju
 
-### `npm run build`
+## 🛠️ Tehnologije
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+**Frontend**: React 19 
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+**Routing**: React Router DOM v7
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+**State Management**: Context API + Custom Hooks
 
-### `npm run eject`
+**Styling**: CSS3 + CSS Modules
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+**HTTP Client**: Axios (Mock API)
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+**Storage**: localStorage API
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+**Build Tool**: Create React App
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+**Version Control**: Git
 
-## Learn More
+## 🚀 Instalacija
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+```bash
+# 1. Kloniraj repozitorijum
+git clone https://github.com/elab-development/internet-tehnologije-2024-projekat-prodajaulaznica_2021_0255/
+cd react-domaci
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+# 2. Instaliraj zavisnosti
+npm install
 
-### Code Splitting
+# 3. Pokreni development server
+npm start
+# Aplikacija će se pokrenuti na http://localhost:3000
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+## 📁 Struktura projekta
 
-### Analyzing the Bundle Size
+```
+src/
+├── components/
+│   ├── common/             # Reusable komponente
+│   │   ├── Button/            # Univerzalno dugme
+│   │   ├── EventCard/         # Kartica događaja
+│   │   ├── InputField/        # Input polje sa validacijom
+│   │   ├── Pagination/        # Paginacija komponenta
+│   │   ├── Breadcrumbs/       # Hijerarhijska navigacija
+│   │   ├── Modal/             # Modalni prozori
+│   │   └── LoadingSpinner/    # Loading indikatori
+│   └── layout/             # Layout komponente
+│       ├── Header/            # Navigacija
+│       ├── Footer/            # Footer
+│       └── Layout/            # Wrapper komponenta
+├── pages/                  # Stranice aplikacije
+│   ├── HomePage/              # Početna stranica
+│   ├── EventsPage/            # Lista događaja sa filterima
+│   ├── EventDetailsPage/      # Detalji jednog događaja
+│   ├── CartPage/              # Korpa za kupovinu
+│   ├── ProfilePage/           # Korisnički profil
+│   └── LoginPage/             # Prijava korisnika
+├── hooks/                  # Custom React hooks
+│   ├── useDebounce.js         # Debounce optimizacija
+│   └── useLocalStorage.js     # localStorage integracija
+├── context/                # Context API
+│   └── CartContext.js         # Globalno stanje korpe
+├── services/               # API servis
+    └── api.js                 # Mock API funkcije
+```
+## 🌐 Rutiranje
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
 
-### Making a Progressive Web App
+| Ruta         | Komponenta      | Opis                                      |
+| :----------- | :-------------- | :---------------------------------------- |
+| /            | HomePage        | Početna stranica sa featured događajima   |
+| /events      | EventsPage      | Lista svih događaja sa paginacijom i filterima |
+| /events/:id  | EventDetailsPage| Detalji pojedinačnog događaja             |
+| /cart        | CartPage        | Korpa sa mogućnostima checkout-a          |
+| /profile     | ProfilePage     | Korisnički profil (u razvoju)             |
+| /login       | LoginPage       | Forma za prijavu (u razvoju)              |
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+## 🎯 Ključne funkcionalnosti
 
-### Advanced Configuration
+### 🔍 EventsPage - Napredna pretraga
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+-   **Real-time search**: Debounced pretraga sa 500ms kašnjenjem
+-   **Kategorijski filteri**: Muzika, Sport, Pozorište, Film, Komedija
+-   **Sortiranje**: Po datumu, ceni, nazivu (rastući/opadajući)
+-   **Paginacija**: 4 događaja po stranici
+-   **Reset filtera**: Jednim klikom nazad na početno stanje
 
-### Deployment
+### 🎫 EventDetailsPage - Detaljan prikaz
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+-   **Breadcrumbs navigacija**: Početna ▶️ Događaji ▶️ Detalji
+-   **Image zoom**: Modal za uvećavanje slika
+-   **Quantity selector**: Izbor broja karata (1 do max dostupnih)
+-   **Dual purchase options**: "Dodaj u korpu" ili "Kupi odmah"
+-   **Responsive layout**: Grid na desktop, stack na mobile
 
-### `npm run build` fails to minify
+### 🛒 CartPage - Kompleksna korpa
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+-   **CRUD operacije**: Dodavanje, ažuriranje, uklanjanje stavki
+-   **localStorage persistance**: Čuva se između sesija
+-   **Checkout simulacija**: Loading states i success feedback
+-   **Clear cart modal**: Potvrda pre brisanja cele korpe
+-   **Order summary**: Real-time kalkulacija ukupne cene
+
+### 🧩 Reusable komponente
+
+-   **Button**: 5 varijanti (primary, secondary, outline, success, danger)
+-   **Modal**: Portal-based sa keyboard navigation
+-   **InputField**: Validacija, error states, ikone
+-   **Pagination**: Customizable sa first/last page shortcuts
+-   **LoadingSpinner**: Različite veličine i boje
+-   **EventCard**: Compact i full varijante
+-   **Breadcrumbs**: Automatic path generation
+
+## ⚡ Performance optimizacije
+
+**Debounced Search**: Smanjuje API pozive sa 300ms na ~2-3 poziva tokom kucanja
+
+**localStorage Cache**: Korpa se učitava instantly iz local storage-a
+
+**Conditional Rendering**: Breadcrumbs i komponente se renderuju samo kad su potrebni
+
+
+
+## 🔧 Custom Hooks
+
+### useDebounce(value, delay)
+```javascript
+// Optimizuje pretragu tako što čeka da korisnik završi kucanje
+const debouncedSearchTerm = useDebounce(searchTerm, 500);
+```
+
+### useLocalStorage(key, initialValue)
+```javascript
+// Automatski sinhronizuje state sa localStorage
+const [cartItems, setCartItems] = useLocalStorage('cart', []);
+```
+
+### useCart()
+```javascript
+// Enkapsulira svu logiku za upravljanje korpom
+const { addToCart, removeFromCart, getTotalPrice } = useCart();
+```
+
+## 📄 Licenca
+
+**Razvili**: Tamara Sarajlija 2021/0255, Jovana Stajčić 2021/0245
+
+**Fakultet Organizacionih nauka, Internet tehnologije**
+
+----------

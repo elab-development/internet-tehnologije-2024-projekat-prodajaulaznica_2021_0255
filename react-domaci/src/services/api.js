@@ -31,7 +31,7 @@ const mockEvents = [
     location: "Narodno pozorište, Beograd",
     price: 1200,
     image: "https://picsum.photos/400/250?random=2",
-    availableTickets: 200,
+    availableTickets: 0,
     featured: false,
   },
   {

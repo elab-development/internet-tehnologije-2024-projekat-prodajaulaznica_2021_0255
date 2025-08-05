@@ -6,6 +6,8 @@ use App\Http\Controllers\EventController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\TicketController;
 
+Route::middleware('api.response')->group(function () {
+
 // Public routes (no authentication required)
 Route::post('register', [AuthController::class, 'register']);
 Route::post('login', [AuthController::class, 'login']);
@@ -53,4 +55,6 @@ Route::post('debug', function (Request $request) {
         'message' => 'API endpoint hit',
         'data' => $request->all()
     ], 201);
+});
+
 });

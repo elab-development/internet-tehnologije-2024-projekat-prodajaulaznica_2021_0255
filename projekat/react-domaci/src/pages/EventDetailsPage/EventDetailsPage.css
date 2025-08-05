@@ -1,0 +1,425 @@
+.event-details-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.event-details-container {
+  display: flex;
+  flex-direction: column;
+  gap: 3rem;
+}
+
+/* Event Header */
+.event-header {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3rem;
+  background: white;
+  padding: 2rem;
+  border-radius: 16px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+}
+
+.event-image-container {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.3s ease;
+}
+
+.event-image-container:hover {
+  transform: scale(1.02);
+}
+
+.event-main-image {
+  width: 100%;
+  height: 400px;
+  object-fit: cover;
+  border-radius: 12px;
+}
+
+.featured-badge {
+  position: absolute;
+  top: 15px;
+  left: 15px;
+  background: linear-gradient(135deg, #ffd700, #ffed4e);
+  color: #333;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  font-weight: bold;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.category-badge {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: rgba(102, 126, 234, 0.9);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  backdrop-filter: blur(10px);
+}
+
+.view-image-btn {
+  position: absolute;
+  bottom: 15px;
+  right: 15px;
+  background: rgba(255, 255, 255, 0.9) !important;
+  backdrop-filter: blur(10px);
+}
+
+.event-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.event-title {
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: #2c3e50;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.event-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.meta-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.meta-icon {
+  font-size: 1.5rem;
+  width: 30px;
+  text-align: center;
+}
+
+.meta-item strong {
+  color: #2c3e50;
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.meta-item p {
+  margin: 0;
+  color: #666;
+  font-size: 1.1rem;
+}
+
+.price-section {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  border-radius: 12px;
+  margin-top: auto;
+}
+
+.price {
+  font-size: 2rem;
+  font-weight: bold;
+}
+
+.per-ticket {
+  opacity: 0.8;
+  font-size: 1rem;
+}
+
+/* Event Description */
+.event-description {
+  background: white;
+  padding: 2rem;
+  border-radius: 16px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+}
+
+.event-description h2 {
+  margin: 0 0 1.5rem 0;
+  color: #2c3e50;
+  font-size: 1.8rem;
+}
+
+.event-description p {
+  font-size: 1.1rem;
+  line-height: 1.8;
+  color: #555;
+  margin: 0;
+}
+
+/* Purchase Section */
+.purchase-section {
+  background: white;
+  padding: 2rem;
+  border-radius: 16px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+}
+
+.purchase-section h2 {
+  margin: 0 0 2rem 0;
+  color: #2c3e50;
+  font-size: 1.8rem;
+}
+
+.purchase-form {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.quantity-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.quantity-selector label {
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.quantity-input {
+  max-width: 150px;
+}
+
+.total-price {
+  padding: 1rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+  font-size: 1.2rem;
+  color: #2c3e50;
+}
+
+.purchase-buttons {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.sold-out {
+  text-align: center;
+  padding: 2rem;
+  background: #fef5f5;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  color: #dc3545;
+}
+
+.sold-out h3 {
+  margin: 0 0 1rem 0;
+  font-size: 1.5rem;
+}
+
+.sold-out p {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+/* Navigation Section */
+.navigation-section {
+  display: flex;
+  justify-content: center;
+  padding: 1rem;
+}
+
+/* Modal Content */
+.success-modal {
+  text-align: center;
+}
+
+.success-modal p {
+  margin: 0 0 2rem 0;
+  font-size: 1.1rem;
+  color: #555;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.image-modal {
+  text-align: center;
+}
+
+.full-image {
+  max-width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+/* Loading and Error States */
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 4rem;
+  color: #667eea;
+  font-size: 1.1rem;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.error {
+  text-align: center;
+  padding: 3rem;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+}
+
+.error h2 {
+  color: #dc3545;
+  margin: 0 0 1rem 0;
+}
+
+.error p {
+  color: #666;
+  margin: 0 0 2rem 0;
+  font-size: 1.1rem;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .event-header {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+
+  .event-main-image {
+    height: 300px;
+  }
+
+  .event-title {
+    font-size: 2rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .event-details-page {
+    padding: 1rem;
+  }
+
+  .event-details-container {
+    gap: 2rem;
+  }
+
+  .event-header,
+  .event-description,
+  .purchase-section {
+    padding: 1.5rem;
+  }
+
+  .event-title {
+    font-size: 1.75rem;
+  }
+
+  .event-main-image {
+    height: 250px;
+  }
+
+  .meta-item {
+    gap: 0.75rem;
+  }
+
+  .meta-icon {
+    font-size: 1.25rem;
+    width: 25px;
+  }
+
+  .price {
+    font-size: 1.5rem;
+  }
+
+  .purchase-buttons {
+    flex-direction: column;
+  }
+
+  .purchase-buttons .btn {
+    width: 100%;
+  }
+
+  .modal-actions {
+    flex-direction: column;
+  }
+
+  .modal-actions .btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .event-details-page {
+    padding: 0.5rem;
+  }
+
+  .event-header,
+  .event-description,
+  .purchase-section {
+    padding: 1rem;
+  }
+
+  .event-title {
+    font-size: 1.5rem;
+  }
+
+  .event-main-image {
+    height: 200px;
+  }
+
+  .featured-badge,
+  .category-badge {
+    padding: 6px 12px;
+    font-size: 0.8rem;
+  }
+
+  .view-image-btn {
+    bottom: 10px;
+    right: 10px;
+  }
+
+  .price-section {
+    padding: 1rem;
+    flex-direction: column;
+    text-align: center;
+    gap: 0.25rem;
+  }
+
+  .price {
+    font-size: 1.75rem;
+  }
+}

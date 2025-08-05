@@ -1,12 +1,14 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\AuthController;
-use App\Http\Controllers\EventController;
-use App\Http\Controllers\CategoryController;
-use App\Http\Controllers\TicketController;
+use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\EventController;
+use App\Http\Controllers\Api\CategoryController;
+use App\Http\Controllers\Api\TicketController;
 
 Route::middleware('api.response')->group(function () {
+
+    Route::get('csrf-cookie', [AuthController::class, 'csrf']);
 
 // Public routes (no authentication required)
 Route::post('register', [AuthController::class, 'register']);

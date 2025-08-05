@@ -68,4 +68,11 @@ class AuthController extends Controller
             'message' => 'Logged out successfully'
         ]);
     }
+
+    // Add this method to AuthController
+    public function csrf()
+    {
+        return response()->json(['message' => 'CSRF cookie set']);
+    }
+
 }

@@ -11,16 +11,21 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
-    ->withMiddleware(function (Middleware $middleware) {
-        $middleware->api(prepend: [
-            \Illuminate\Http\Middleware\HandleCors::class,
+   ->withMiddleware(function (Middleware $middleware) {
+        $middleware->api([
+            \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
+            'throttle:api',
+            \Illuminate\Routing\Middleware\SubstituteBindings::class,
         ]);
-        // Register your custom route middleware alias
+        
+        $middleware->api(prepend: [
+             \Illuminate\Http\Middleware\HandleCors::class,
+        ]);
+        
         $middleware->alias([
             'api.response' => \App\Http\Middleware\ApiResponseMiddleware::class,
         ]);
     })
-
     ->withExceptions(function (Exceptions $exceptions): void {
         //
     })->create();

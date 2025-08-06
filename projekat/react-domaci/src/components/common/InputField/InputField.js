@@ -1,5 +1,4 @@
-import React, { useState } from "react";
-import "./InputField.css";
+import React from "react";
 
 const InputField = ({
   label,
@@ -7,70 +6,60 @@ const InputField = ({
   placeholder,
   value,
   onChange,
-  onBlur,
-  error,
-  disabled = false,
-  required = false,
-  icon,
-  className = "",
   name,
-  id,
-  autoComplete = "off",
+  error,
+  required = false,
+  className = "",
+  ...props
 }) => {
-  const [isFocused, setIsFocused] = useState(false);
-
-  const handleFocus = () => {
-    setIsFocused(true);
-  };
-
-  const handleBlur = (e) => {
-    setIsFocused(false);
-    if (onBlur) {
-      onBlur(e);
-    }
-  };
-
-  const inputClass = `
-    input-field 
-    ${error ? "input-field-error" : ""} 
-    ${disabled ? "input-field-disabled" : ""} 
-    ${isFocused ? "input-field-focused" : ""}
-    ${icon ? "input-field-with-icon" : ""}
-    ${className}
-  `.trim();
-
   return (
-    <div className="input-wrapper">
+    <div style={{ marginBottom: "1rem" }}>
       {label && (
         <label
-          htmlFor={id || name}
-          className={`input-label ${required ? "input-label-required" : ""}`}
+          htmlFor={name}
+          style={{
+            display: "block",
+            marginBottom: "0.5rem",
+            fontWeight: "500",
+            color: error ? "#e53e3e" : "#333",
+          }}
         >
-          {label}
-          {required && <span className="required-asterisk">*</span>}
+          {label} {required && <span style={{ color: "#e53e3e" }}>*</span>}
         </label>
       )}
-
-      <div className="input-container">
-        {icon && <span className="input-icon">{icon}</span>}
-
-        <input
-          type={type}
-          id={id || name}
-          name={name}
-          value={value || ""}
-          onChange={onChange}
-          onFocus={handleFocus}
-          onBlur={handleBlur}
-          placeholder={placeholder}
-          disabled={disabled}
-          required={required}
-          autoComplete={autoComplete}
-          className={inputClass}
-        />
-      </div>
-
-      {error && <span className="input-error-message">{error}</span>}
+      <input
+        id={name}
+        name={name}
+        type={type}
+        placeholder={placeholder}
+        value={value}
+        onChange={onChange}
+        required={required}
+        className={className}
+        style={{
+          width: "100%",
+          padding: "0.75rem",
+          border: `1px solid ${error ? "#e53e3e" : "#ddd"}`,
+          borderRadius: "4px",
+          fontSize: "1rem",
+          outline: "none",
+          transition: "border-color 0.2s",
+          backgroundColor: error ? "#fef5f5" : "white",
+        }}
+        {...props}
+      />
+      {error && (
+        <span
+          style={{
+            color: "#e53e3e",
+            fontSize: "0.875rem",
+            marginTop: "0.25rem",
+            display: "block",
+          }}
+        >
+          {error}
+        </span>
+      )}
     </div>
   );
 };

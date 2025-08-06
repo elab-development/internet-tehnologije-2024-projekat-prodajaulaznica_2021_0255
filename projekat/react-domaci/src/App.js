@@ -10,6 +10,8 @@ import LoginPage from "./pages/LoginPage/LoginPage";
 import { CartProvider } from "./context/CartContext";
 import { AuthProvider } from "./context/AuthContext";
 import RegisterPage from "./pages/RegisterPage/RegistrerPage";
+import ProtectedRoute from "./components/common/ProtectedRoute/ProtectedRoute";
+import GuestRoute from "./components/common/GuestRoute/GuestRoute";
 import "./App.css";
 
 function App() {
@@ -20,13 +22,63 @@ function App() {
           <div className="App">
             <Layout>
               <Routes>
+                {/* Public routes */}
                 <Route path="/" element={<HomePage />} />
                 <Route path="/events" element={<EventsPage />} />
                 <Route path="/events/:id" element={<EventDetailsPage />} />
-                <Route path="/cart" element={<CartPage />} />
-                <Route path="/profile" element={<ProfilePage />} />
-                <Route path="/login" element={<LoginPage />} />
-                <Route path="/register" element={<RegisterPage />} />
+
+                {/* Guest only routes (redirect if authenticated) */}
+                <Route
+                  path="/login"
+                  element={
+                    <GuestRoute>
+                      <LoginPage />
+                    </GuestRoute>
+                  }
+                />
+                <Route
+                  path="/register"
+                  element={
+                    <GuestRoute>
+                      <RegisterPage />
+                    </GuestRoute>
+                  }
+                />
+
+                {/* Protected routes (require authentication) */}
+                <Route
+                  path="/cart"
+                  element={
+                    <ProtectedRoute>
+                      <CartPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/profile"
+                  element={
+                    <ProtectedRoute>
+                      <ProfilePage />
+                    </ProtectedRoute>
+                  }
+                />
+
+                {/* Catch all route */}
+                <Route
+                  path="*"
+                  element={
+                    <div
+                      style={{
+                        textAlign: "center",
+                        padding: "2rem",
+                      }}
+                    >
+                      <h2>Stranica nije pronađena</h2>
+                      <p>Tražena stranica ne postoji.</p>
+                      <a href="/">Vrati se na početnu</a>
+                    </div>
+                  }
+                />
               </Routes>
             </Layout>
           </div>

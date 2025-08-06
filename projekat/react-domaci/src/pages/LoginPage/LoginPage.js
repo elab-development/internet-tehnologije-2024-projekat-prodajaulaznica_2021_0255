@@ -3,10 +3,17 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import Button from "../../components/common/Button";
 import InputField from "../../components/common/InputField";
+import { useLocation } from "react-router-dom";
 
 const LoginPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth();
+
+  // Get the redirect path from location state
+  const from = location.state?.from?.pathname || "/";
+
+  // State variables
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -14,12 +21,13 @@ const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // Handle input changes
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
-    setError(""); // Clear error when user types
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -30,7 +38,8 @@ const LoginPage = () => {
     const result = await login(formData);
 
     if (result.success) {
-      navigate("/");
+      // Redirect to intended page or home
+      navigate(from, { replace: true });
     } else {
       setError(result.message);
     }
@@ -41,7 +50,6 @@ const LoginPage = () => {
   return (
     <div style={{ maxWidth: "400px", margin: "2rem auto", padding: "2rem" }}>
       <h2>Prijava</h2>
-
       {error && (
         <div
           style={{
@@ -56,7 +64,6 @@ const LoginPage = () => {
           {error}
         </div>
       )}
-
       <form onSubmit={handleSubmit}>
         <InputField
           label="Email"
@@ -67,7 +74,6 @@ const LoginPage = () => {
           placeholder="your@email.com"
           required
         />
-
         <InputField
           label="Lozinka"
           type="password"
@@ -77,7 +83,6 @@ const LoginPage = () => {
           placeholder="••••••••"
           required
         />
-
         <Button
           type="submit"
           size="large"
@@ -87,7 +92,6 @@ const LoginPage = () => {
           {loading ? "Prijavljivanje..." : "Prijavite se"}
         </Button>
       </form>
-
       <p style={{ textAlign: "center", marginTop: "1rem", color: "#666" }}>
         Nemate nalog? <a href="/register">Registrujte se</a>
       </p>

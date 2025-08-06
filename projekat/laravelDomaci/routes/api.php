@@ -6,7 +6,7 @@ use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\TicketController;
 
-Route::middleware('api.response')->group(function () {
+Route::middleware(['api.errors', 'api.response'])->group(function () {
 
 Route::get('csrf-cookie', [AuthController::class, 'csrf']);
 

@@ -24,6 +24,7 @@ return Application::configure(basePath: dirname(__DIR__))
         
         $middleware->alias([
             'api.response' => \App\Http\Middleware\ApiResponseMiddleware::class,
+            'api.errors' => \App\Http\Middleware\ErrorHandlingMiddleware::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

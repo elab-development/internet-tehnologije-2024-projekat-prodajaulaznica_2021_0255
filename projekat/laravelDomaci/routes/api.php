@@ -8,7 +8,12 @@ use App\Http\Controllers\Api\TicketController;
 
 Route::middleware('api.response')->group(function () {
 
-    Route::get('csrf-cookie', [AuthController::class, 'csrf']);
+Route::get('csrf-cookie', [AuthController::class, 'csrf']);
+
+Route::get('documentation', function () {
+    return redirect('/api/documentation');
+});
+
 
 // Public routes (no authentication required)
 Route::post('register', [AuthController::class, 'register']);
@@ -26,7 +31,7 @@ Route::get('categories/{id}', [CategoryController::class, 'show']);
 Route::get('categories/{id}/events', [CategoryController::class, 'getEvents']);
 
 // Public ticket validation
-Route::get('tickets/validate/{ticketNumber}', [TicketController::class, 'validate']);
+Route::get('tickets/validate/{ticketNumber}', [TicketController::class, 'validateTicket']);
 
 // Protected routes (authentication required)
 Route::middleware('auth:sanctum')->group(function () {

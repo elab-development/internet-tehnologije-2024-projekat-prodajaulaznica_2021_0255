@@ -11,6 +11,31 @@ use Illuminate\Support\Str;
 
 class TicketController extends Controller
 {
+    /**
+    * @OA\Tag(
+    *     name="Tickets",
+    *     description="Operations related to ticket management"
+    * )
+    */
+
+    /**
+     * @OA\Post(
+     *     path="/api/tickets/purchase",
+     *     summary="Purchase a ticket for an event",
+     *     tags={"Tickets"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"event_id"},
+     *             @OA\Property(property="event_id", type="integer", example=1),
+     *             @OA\Property(property="discount_percentage", type="number", example=10)
+     *         )
+     *     ),
+     *     @OA\Response(response=201, description="Ticket purchased successfully"),
+     *     @OA\Response(response=422, description="Validation failed or no tickets available")
+     * )
+     */
     public function purchaseTicket(Request $request): JsonResponse
     {
         $request->validate([
@@ -59,6 +84,15 @@ class TicketController extends Controller
         ], 201);
     }
 
+       /**
+     * @OA\Get(
+     *     path="/api/tickets/my",
+     *     summary="Get tickets for the authenticated user",
+     *     tags={"Tickets"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Response(response=200, description="List of user's tickets")
+     * )
+     */
     public function myTickets(Request $request): JsonResponse
     {
         $tickets = Ticket::where('user_id', $request->user()->id)
@@ -71,6 +105,23 @@ class TicketController extends Controller
         ]);
     }
 
+    /**
+     * @OA\Get(
+     *     path="/api/tickets/{id}",
+     *     summary="Get a single ticket by ID",
+     *     tags={"Tickets"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(response=200, description="Ticket details"),
+     *     @OA\Response(response=403, description="Unauthorized access"),
+     *     @OA\Response(response=404, description="Ticket not found")
+     * )
+     */
     public function show($id): JsonResponse
     {
         $ticket = Ticket::with(['event.category', 'user'])->findOrFail($id);
@@ -85,6 +136,22 @@ class TicketController extends Controller
         return response()->json($ticket);
     }
 
+        /**
+     * @OA\Put(
+     *     path="/api/tickets/{id}/cancel",
+     *     summary="Cancel a ticket",
+     *     tags={"Tickets"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(response=200, description="Ticket cancelled"),
+     *     @OA\Response(response=422, description="Cannot cancel ticket")
+     * )
+     */
     public function cancel($id): JsonResponse
     {
         $ticket = Ticket::where('user_id', auth()->id())->findOrFail($id);
@@ -118,8 +185,22 @@ class TicketController extends Controller
         ]);
     }
 
-    // Javna metoda za validaciju ulaznica (npr. na ulazu)
-    public function validate($ticketNumber): JsonResponse
+    /**
+     * @OA\Get(
+     *     path="/api/tickets/validate/{ticketNumber}",
+     *     summary="Validate a ticket by ticket number",
+     *     tags={"Tickets"},
+     *     @OA\Parameter(
+     *         name="ticketNumber",
+     *         in="path",
+     *         required=true,
+     *         @OA\Schema(type="string")
+     *     ),
+     *     @OA\Response(response=200, description="Ticket is valid"),
+     *     @OA\Response(response=404, description="Invalid ticket number")
+     * )
+     */
+    public function validateTicket($ticketNumber): JsonResponse
     {
         $ticket = Ticket::with('event', 'user')
                        ->where('ticket_number', $ticketNumber)
@@ -141,7 +222,22 @@ class TicketController extends Controller
         ]);
     }
 
-    // Označiti ulaznica kao iskorišćenu
+ /**
+     * @OA\Put(
+     *     path="/api/tickets/{id}/mark-used",
+     *     summary="Mark a ticket as used",
+     *     tags={"Tickets"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(response=200, description="Ticket marked as used"),
+     *     @OA\Response(response=422, description="Ticket not active")
+     * )
+     */
     public function markAsUsed($id): JsonResponse
     {
         $ticket = Ticket::findOrFail($id);

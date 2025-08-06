@@ -11,7 +11,30 @@ use Illuminate\Http\JsonResponse;
 class EventController extends Controller
 {
     /**
-     * Display a listing of the resource.
+     * @OA\Tag(
+     *     name="Events",
+     *     description="Operations related to event management"
+     * )
+     */
+    /**
+     * @OA\Get(
+     *     path="/api/events",
+     *     summary="Get all events with optional filters",
+     *     tags={"Events"},
+     *     @OA\Parameter(
+     *         name="category_id",
+     *         in="query",
+     *         description="Filter by category ID",
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Parameter(
+     *         name="available_only",
+     *         in="query",
+     *         description="Filter to only events with available tickets",
+     *         @OA\Schema(type="boolean")
+     *     ),
+     *     @OA\Response(response=200, description="List of events")
+     * )
      */
     public function index(Request $request): JsonResponse
     {
@@ -33,8 +56,31 @@ class EventController extends Controller
         return response()->json($events);
     }
 
-    /**
-     * Store a newly created resource in storage.
+ /**
+     * @OA\Post(
+     *     path="/api/events",
+     *     summary="Create a new event",
+     *     tags={"Events"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"name", "description", "start_date", "end_date", "location", "price", "total_tickets", "category_id"},
+     *             @OA\Property(property="name", type="string", example="Jazz Night"),
+     *             @OA\Property(property="description", type="string", example="Live jazz event"),
+     *             @OA\Property(property="image_url", type="string", format="url"),
+     *             @OA\Property(property="thumbnail_url", type="string", format="url"),
+     *             @OA\Property(property="start_date", type="string", format="date-time"),
+     *             @OA\Property(property="end_date", type="string", format="date-time"),
+     *             @OA\Property(property="location", type="string"),
+     *             @OA\Property(property="price", type="number", format="float"),
+     *             @OA\Property(property="total_tickets", type="integer"),
+     *             @OA\Property(property="category_id", type="integer")
+     *         )
+     *     ),
+     *     @OA\Response(response=201, description="Event created successfully"),
+     *     @OA\Response(response=422, description="Validation error")
+     * )
      */
     public function store(Request $request): JsonResponse
     {
@@ -73,8 +119,20 @@ class EventController extends Controller
         ], 201);
     }
 
-    /**
-     * Display the specified resource.
+ /**
+     * @OA\Get(
+     *     path="/api/events/{id}",
+     *     summary="Get a specific event by ID",
+     *     tags={"Events"},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(response=200, description="Event found"),
+     *     @OA\Response(response=404, description="Event not found")
+     * )
      */
     public function show($id): JsonResponse
     {
@@ -90,8 +148,33 @@ class EventController extends Controller
         return response()->json($event);
     }
 
-    /**
-     * Update the specified resource in storage.
+     /**
+     * @OA\Put(
+     *     path="/api/events/{id}",
+     *     summary="Update an event",
+     *     tags={"Events"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\RequestBody(
+     *         @OA\JsonContent(
+     *             @OA\Property(property="name", type="string"),
+     *             @OA\Property(property="description", type="string"),
+     *             @OA\Property(property="start_date", type="string", format="date-time"),
+     *             @OA\Property(property="end_date", type="string", format="date-time"),
+     *             @OA\Property(property="location", type="string"),
+     *             @OA\Property(property="price", type="number"),
+     *             @OA\Property(property="total_tickets", type="integer"),
+     *             @OA\Property(property="category_id", type="integer")
+     *         )
+     *     ),
+     *     @OA\Response(response=200, description="Event updated successfully"),
+     *     @OA\Response(response=422, description="Validation failed")
+     * )
      */
     public function update(Request $request, string $id): JsonResponse
     {
@@ -125,8 +208,21 @@ class EventController extends Controller
         ]);
     }
 
-    /**
-     * Remove the specified resource from storage.
+/**
+     * @OA\Delete(
+     *     path="/api/events/{id}",
+     *     summary="Delete an event",
+     *     tags={"Events"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(response=200, description="Event deleted successfully"),
+     *     @OA\Response(response=422, description="Cannot delete event with sold tickets")
+     * )
      */
     public function destroy(string $id): JsonResponse
     {
@@ -146,7 +242,20 @@ class EventController extends Controller
         ]);
     }
 
-    // Dodatne rute
+    /**
+     * @OA\Get(
+     *     path="/api/categories/{categoryId}/events",
+     *     summary="Get events by category",
+     *     tags={"Events"},
+     *     @OA\Parameter(
+     *         name="categoryId",
+     *         in="path",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(response=200, description="Events for the category")
+     * )
+     */
     public function getEventsByCategory($categoryId): JsonResponse
     {
         $category = Category::findOrFail($categoryId);
@@ -161,6 +270,21 @@ class EventController extends Controller
         ]);
     }
 
+        /**
+     * @OA\Get(
+     *     path="/api/events/{id}/tickets",
+     *     summary="Get tickets info for an event",
+     *     tags={"Events"},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Response(response=200, description="Ticket info returned")
+     * )
+     */
     public function getEventTickets($id): JsonResponse
     {
         $event = Event::with(['tickets.user'])->findOrFail($id);

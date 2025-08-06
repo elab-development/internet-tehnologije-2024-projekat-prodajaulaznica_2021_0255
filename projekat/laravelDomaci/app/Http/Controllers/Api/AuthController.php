@@ -11,6 +11,29 @@ use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
+    /**
+     * @OA\Tag(
+     *     name="Authentication",
+     *     description="Operations related to user authentication"
+     * )
+     */
+    /**
+     * @OA\Post(
+     *     path="/register",
+     *     summary="Register a new user",
+     *     tags={"Authentication"},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"name","email","password"},
+     *             @OA\Property(property="name", type="string"),
+     *             @OA\Property(property="email", type="string"),
+     *             @OA\Property(property="password", type="string")
+     *         )
+     *     ),
+     *     @OA\Response(response=201, description="User registered successfully")
+     * )
+     */
     public function register(Request $request)
     {
         $request->validate([
@@ -36,6 +59,23 @@ class AuthController extends Controller
         ], 201);
     }
 
+    /**
+     * @OA\Post(
+     *     path="/login",
+     *     summary="Login user",
+     *     tags={"Authentication"},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"email","password"},
+     *             @OA\Property(property="email", type="string"),
+     *             @OA\Property(property="password", type="string")
+     *         )
+     *     ),
+     *     @OA\Response(response=200, description="Login successful"),
+     *     @OA\Response(response=401, description="Unauthorized")
+     * )
+     */
     public function login(Request $request)
 {
     $request->validate([
@@ -60,7 +100,15 @@ class AuthController extends Controller
         'frontend_url' => $this->getRedirectUrl(),
     ]);
 }
-
+/**
+     * @OA\Post(
+     *     path="/logout",
+     *     summary="Logout user",
+     *     tags={"Authentication"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Response(response=200, description="Logged out successfully")
+     * )
+     */
     public function logout(Request $request)
     {
         $request->user()->currentAccessToken()->delete();
@@ -70,7 +118,14 @@ class AuthController extends Controller
         ]);
     }
 
-    // Add this method to AuthController
+    /**
+     * @OA\Get(
+     *     path="/csrf-token",
+     *     summary="Get CSRF token",
+     *     tags={"Authentication"},
+     *     @OA\Response(response=200, description="CSRF cookie set")
+     * )
+     */
     public function csrf()
     {
         return response()->json(['message' => 'CSRF cookie set']);

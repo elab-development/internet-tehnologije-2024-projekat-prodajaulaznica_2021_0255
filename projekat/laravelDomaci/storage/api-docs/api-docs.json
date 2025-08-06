@@ -1,0 +1,632 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "Event Management API",
+        "description": "API documentation for Event Management System with Laravel and React",
+        "contact": {
+            "email": "admin@eventmanagement.com"
+        },
+        "version": "1.0.0"
+    },
+    "servers": [
+        {
+            "url": "http://localhost:8000/api",
+            "description": "Local development server"
+        }
+    ],
+    "paths": {
+        "/register": {
+            "post": {
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Register a new user",
+                "operationId": "5d4fa5d5607ed675ba93907e1fc94534",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "name",
+                                    "email",
+                                    "password"
+                                ],
+                                "properties": {
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "email": {
+                                        "type": "string"
+                                    },
+                                    "password": {
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "User registered successfully"
+                    }
+                }
+            }
+        },
+        "/login": {
+            "post": {
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Login user",
+                "operationId": "67d6d0fdd54fba132e1b6f55ca254183",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "email",
+                                    "password"
+                                ],
+                                "properties": {
+                                    "email": {
+                                        "type": "string"
+                                    },
+                                    "password": {
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Login successful"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                }
+            }
+        },
+        "/logout": {
+            "post": {
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Logout user",
+                "operationId": "28d48c13fca984400ac8de99f54ee13a",
+                "responses": {
+                    "200": {
+                        "description": "Logged out successfully"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/csrf-token": {
+            "get": {
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Get CSRF token",
+                "operationId": "bf5eb77c37fb07b7cdc0c0c4b262527f",
+                "responses": {
+                    "200": {
+                        "description": "CSRF cookie set"
+                    }
+                }
+            }
+        },
+        "/api/events": {
+            "get": {
+                "tags": [
+                    "Events"
+                ],
+                "summary": "Get all events with optional filters",
+                "operationId": "e529c81e6aaec82f49950a87ed881f57",
+                "parameters": [
+                    {
+                        "name": "category_id",
+                        "in": "query",
+                        "description": "Filter by category ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "available_only",
+                        "in": "query",
+                        "description": "Filter to only events with available tickets",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of events"
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Events"
+                ],
+                "summary": "Create a new event",
+                "operationId": "e958e1c6c275d5f9b7ebcd837903d0ef",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "name",
+                                    "description",
+                                    "start_date",
+                                    "end_date",
+                                    "location",
+                                    "price",
+                                    "total_tickets",
+                                    "category_id"
+                                ],
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "example": "Jazz Night"
+                                    },
+                                    "description": {
+                                        "type": "string",
+                                        "example": "Live jazz event"
+                                    },
+                                    "image_url": {
+                                        "type": "string",
+                                        "format": "url"
+                                    },
+                                    "thumbnail_url": {
+                                        "type": "string",
+                                        "format": "url"
+                                    },
+                                    "start_date": {
+                                        "type": "string",
+                                        "format": "date-time"
+                                    },
+                                    "end_date": {
+                                        "type": "string",
+                                        "format": "date-time"
+                                    },
+                                    "location": {
+                                        "type": "string"
+                                    },
+                                    "price": {
+                                        "type": "number",
+                                        "format": "float"
+                                    },
+                                    "total_tickets": {
+                                        "type": "integer"
+                                    },
+                                    "category_id": {
+                                        "type": "integer"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Event created successfully"
+                    },
+                    "422": {
+                        "description": "Validation error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/events/{id}": {
+            "get": {
+                "tags": [
+                    "Events"
+                ],
+                "summary": "Get a specific event by ID",
+                "operationId": "c0f602d773798994c228d99dbd63b842",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Event found"
+                    },
+                    "404": {
+                        "description": "Event not found"
+                    }
+                }
+            },
+            "put": {
+                "tags": [
+                    "Events"
+                ],
+                "summary": "Update an event",
+                "operationId": "8b1dd7f57d8fbd2e85af2762950e0b1d",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "description": {
+                                        "type": "string"
+                                    },
+                                    "start_date": {
+                                        "type": "string",
+                                        "format": "date-time"
+                                    },
+                                    "end_date": {
+                                        "type": "string",
+                                        "format": "date-time"
+                                    },
+                                    "location": {
+                                        "type": "string"
+                                    },
+                                    "price": {
+                                        "type": "number"
+                                    },
+                                    "total_tickets": {
+                                        "type": "integer"
+                                    },
+                                    "category_id": {
+                                        "type": "integer"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Event updated successfully"
+                    },
+                    "422": {
+                        "description": "Validation failed"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "Events"
+                ],
+                "summary": "Delete an event",
+                "operationId": "deca25daa2d423da0ff6b6677d92545b",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Event deleted successfully"
+                    },
+                    "422": {
+                        "description": "Cannot delete event with sold tickets"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/categories/{categoryId}/events": {
+            "get": {
+                "tags": [
+                    "Events"
+                ],
+                "summary": "Get events by category",
+                "operationId": "6d4a42baf16dce723db8039d2c288654",
+                "parameters": [
+                    {
+                        "name": "categoryId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Events for the category"
+                    }
+                }
+            }
+        },
+        "/api/events/{id}/tickets": {
+            "get": {
+                "tags": [
+                    "Events"
+                ],
+                "summary": "Get tickets info for an event",
+                "operationId": "767f4a4958dda9be63d42c7750e732e7",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Ticket info returned"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/tickets/purchase": {
+            "post": {
+                "tags": [
+                    "Tickets"
+                ],
+                "summary": "Purchase a ticket for an event",
+                "operationId": "20c50efe26f3068218a5548c98385c83",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "event_id"
+                                ],
+                                "properties": {
+                                    "event_id": {
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "discount_percentage": {
+                                        "type": "number",
+                                        "example": 10
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Ticket purchased successfully"
+                    },
+                    "422": {
+                        "description": "Validation failed or no tickets available"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/tickets/my": {
+            "get": {
+                "tags": [
+                    "Tickets"
+                ],
+                "summary": "Get tickets for the authenticated user",
+                "operationId": "76d81fa3bcbe69bcc5a06a4dbddfa826",
+                "responses": {
+                    "200": {
+                        "description": "List of user's tickets"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/tickets/{id}": {
+            "get": {
+                "tags": [
+                    "Tickets"
+                ],
+                "summary": "Get a single ticket by ID",
+                "operationId": "da5292e25da44db69ed981a43357753c",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Ticket details"
+                    },
+                    "403": {
+                        "description": "Unauthorized access"
+                    },
+                    "404": {
+                        "description": "Ticket not found"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/tickets/{id}/cancel": {
+            "put": {
+                "tags": [
+                    "Tickets"
+                ],
+                "summary": "Cancel a ticket",
+                "operationId": "0bd6107fe0b09f4514f2ec73ef52793a",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Ticket cancelled"
+                    },
+                    "422": {
+                        "description": "Cannot cancel ticket"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/tickets/validate/{ticketNumber}": {
+            "get": {
+                "tags": [
+                    "Tickets"
+                ],
+                "summary": "Validate a ticket by ticket number",
+                "operationId": "c535eabbb718a22a7d226c5bfebfbdb7",
+                "parameters": [
+                    {
+                        "name": "ticketNumber",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Ticket is valid"
+                    },
+                    "404": {
+                        "description": "Invalid ticket number"
+                    }
+                }
+            }
+        },
+        "/api/tickets/{id}/mark-used": {
+            "put": {
+                "tags": [
+                    "Tickets"
+                ],
+                "summary": "Mark a ticket as used",
+                "operationId": "f3d6ac4a6e85126ae3fad1fbdcd12175",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Ticket marked as used"
+                    },
+                    "422": {
+                        "description": "Ticket not active"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        }
+    },
+    "components": {
+        "securitySchemes": {
+            "bearerAuth": {
+                "type": "http",
+                "bearerFormat": "JWT",
+                "scheme": "bearer"
+            }
+        }
+    },
+    "tags": [
+        {
+            "name": "Authentication",
+            "description": "Authentication"
+        },
+        {
+            "name": "Events",
+            "description": "Events"
+        },
+        {
+            "name": "Tickets",
+            "description": "Tickets"
+        }
+    ]
+}

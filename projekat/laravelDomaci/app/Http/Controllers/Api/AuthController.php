@@ -37,28 +37,29 @@ class AuthController extends Controller
     }
 
     public function login(Request $request)
-    {
-        $request->validate([
-            'email' => 'required|email',
-            'password' => 'required',
-        ]);
+{
+    $request->validate([
+        'email' => 'required|email',
+        'password' => 'required',
+    ]);
 
-        if (!Auth::attempt($request->only('email', 'password'))) {
-            return response()->json([
-                'message' => 'Login failed, credentials are wrong!'
-            ]);
-        }
-
-        $user = User::where('email', $request->email)->firstOrFail();
-        $token = $user->createToken('auth_token')->plainTextToken;
-
+    if (!Auth::attempt($request->only('email', 'password'))) {
         return response()->json([
-            'message' => 'Login successful',
-            'user' => $user,
-            'access_token' => $token,
-            'token_type' => 'Bearer',
-        ]);
+            'message' => 'Login failed, credentials are wrong!'
+        ], 401);
     }
+
+    $user = User::where('email', $request->email)->firstOrFail();
+    $token = $user->createToken('auth_token')->plainTextToken;
+
+    return response()->json([
+        'message' => 'Login successful',
+        'user' => $user,
+        'access_token' => $token,
+        'token_type' => 'Bearer',
+        'frontend_url' => $this->getRedirectUrl(),
+    ]);
+}
 
     public function logout(Request $request)
     {
@@ -75,4 +76,8 @@ class AuthController extends Controller
         return response()->json(['message' => 'CSRF cookie set']);
     }
 
+    protected function getRedirectUrl()
+    {
+        return config('frontend.url');
+    }
 }

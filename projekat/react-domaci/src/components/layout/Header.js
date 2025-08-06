@@ -1,6 +1,7 @@
 import React, { useContext } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { CartContext } from "../../context/CartContext";
+import AuthStatus from "../common/AuthStatus/AuthStatus";
 import "./Header.css";
 
 const Header = () => {
@@ -45,6 +46,7 @@ const Header = () => {
               <span className="cart-count">{cartItemsCount}</span>
             )}
           </Link>
+          <AuthStatus />
         </div>
       </div>
     </header>

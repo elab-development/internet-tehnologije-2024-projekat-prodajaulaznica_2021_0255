@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
 import EventForm from "../../components/admin/EventForm";
+import EventStatusManager from "../../components/admin/EventStatusManager";
 import Button from "../../components/common/Button";
 import Modal from "../../components/common/Modal";
 import Pagination from "../../components/common/Pagination";
@@ -198,6 +199,15 @@ const AdminEventsPage = () => {
                   <th
                     style={{
                       padding: "1rem",
+                      textAlign: "left",
+                      borderBottom: "1px solid #dee2e6",
+                    }}
+                  >
+                    Upravljanje
+                  </th>
+                  <th
+                    style={{
+                      padding: "1rem",
                       textAlign: "center",
                       borderBottom: "1px solid #dee2e6",
                     }}
@@ -275,6 +285,18 @@ const AdminEventsPage = () => {
                       >
                         {event.is_active ? "Aktivan" : "Završen"}
                       </span>
+                    </td>
+                    <td style={{ padding: "1rem" }}>
+                      <EventStatusManager
+                        event={event}
+                        onUpdate={(updatedEvent) => {
+                          setEvents((prev) =>
+                            prev.map((e) =>
+                              e.id === updatedEvent.id ? updatedEvent : e
+                            )
+                          );
+                        }}
+                      />
                     </td>
                     <td style={{ padding: "1rem", textAlign: "center" }}>
                       <div

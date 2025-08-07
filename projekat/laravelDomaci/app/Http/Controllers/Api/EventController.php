@@ -445,66 +445,132 @@ class EventController extends Controller
         }
     }
  
-
-     /**
+      /**
      * @OA\Put(
-     *     path="/api/events/{id}",
-     *     summary="Update an event",
-     *     tags={"Events"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(
-     *         name="id",
-     *         in="path",
-     *         required=true,
-     *         @OA\Schema(type="integer")
-     *     ),
-     *     @OA\RequestBody(
-     *         @OA\JsonContent(
-     *             @OA\Property(property="name", type="string"),
-     *             @OA\Property(property="description", type="string"),
-     *             @OA\Property(property="start_date", type="string", format="date-time"),
-     *             @OA\Property(property="end_date", type="string", format="date-time"),
-     *             @OA\Property(property="location", type="string"),
-     *             @OA\Property(property="price", type="number"),
-     *             @OA\Property(property="total_tickets", type="integer"),
-     *             @OA\Property(property="category_id", type="integer")
-     *         )
-     *     ),
-     *     @OA\Response(response=200, description="Event updated successfully"),
-     *     @OA\Response(response=422, description="Validation failed")
+     * path="/api/events/{id}",
+     * operationId="updateEvent",
+     * tags={"Events"},
+     * summary="Ažuriranje postojećeg događaja",
+     * description="Ažurira podatke za događaj sa prosleđenim ID-jem. Sva polja su opciona.",
+     * @OA\Parameter(
+     * name="id",
+     * in="path",
+     * required=true,
+     * description="ID događaja za ažuriranje",
+     * @OA\Schema(type="string", format="uuid")
+     * ),
+     * @OA\RequestBody(
+     * required=true,
+     * description="Podaci za ažuriranje događaja",
+     * @OA\JsonContent(
+     * type="object",
+     * @OA\Property(property="name", type="string", example="Updated Tech Conference 2025"),
+     * @OA\Property(property="description", type="string", example="An updated description of the biggest tech conference in the region."),
+     * @OA\Property(property="image_url", type="string", format="uri", example="https://example.com/images/event_new.jpg"),
+     * @OA\Property(property="thumbnail_url", type="string", format="uri", example="https://example.com/images/event_thumb_new.jpg"),
+     * @OA\Property(property="start_date", type="string", format="date-time", example="2025-10-21 09:00:00"),
+     * @OA\Property(property="end_date", type="string", format="date-time", example="2025-10-22 17:00:00"),
+     * @OA\Property(property="location", type="string", example="Belgrade, Serbia"),
+     * @OA\Property(property="price", type="number", format="float", example=55.00),
+     * @OA\Property(property="total_tickets", type="integer", example=600),
+     * @OA\Property(property="category_id", type="string", format="uuid", example="9cde5f4d-6a56-4b13-9cf6-95333f24f86d"),
+     * @OA\Property(property="featured", type="boolean", example=false)
+     * )
+     * ),
+     * @OA\Response(
+     * response=200,
+     * description="Uspešno ažuriran događaj",
+     * @OA\JsonContent(
+     * @OA\Property(property="success", type="boolean", example=true),
+     * @OA\Property(property="message", type="string", example="Event updated successfully"),
+     * @OA\Property(property="data", ref="#/components/schemas/EventResource")
+     * )
+     * ),
+     * @OA\Response(response=404, description="Događaj nije pronađen"),
+     * @OA\Response(response=422, description="Greška pri validaciji (npr. ukupan broj karata je manji od prodatih)"),
+     * @OA\Response(response=500, description="Serverska greška")
      * )
      */
-    public function update(Request $request, string $id): JsonResponse
+   public function update(Request $request, string $id): JsonResponse
     {
-        $event = Event::findOrFail($id);
+        try {
+            $event = Event::findOrFail($id);
+            
+            $request->validate([
+                'name' => 'sometimes|string|max:255',
+                'description' => 'sometimes|string',
+                'image_url' => 'nullable|url|max:500',
+                'thumbnail_url' => 'nullable|url|max:500',
+                'start_date' => 'sometimes|date',
+                'end_date' => 'sometimes|date|after:start_date',
+                'location' => 'sometimes|string|max:255',
+                'price' => 'sometimes|numeric|min:0',
+                'total_tickets' => 'sometimes|integer|min:1',
+                'available_tickets' => 'sometimes|integer|min:0',
+                'category_id' => 'sometimes|exists:categories,id',
+                'featured' => 'sometimes|boolean'
+            ]);
 
-        $request->validate([
-            'name' => 'sometimes|string|max:255',
-            'description' => 'sometimes|string',
-            'image_url' => 'nullable|url',
-            'thumbnail_url' => 'nullable|url',
-            'start_date' => 'sometimes|date',
-            'end_date' => 'sometimes|date|after:start_date',
-            'location' => 'sometimes|string|max:255',
-            'price' => 'sometimes|numeric|min:0',
-            'total_tickets' => 'sometimes|integer|min:1',
-            'category_id' => 'sometimes|exists:categories,id'
-        ]);
+            // Check if total_tickets is being reduced below sold tickets
+            if ($request->has('total_tickets')) {
+                $soldTickets = $event->total_tickets - $event->available_tickets;
+                
+                if ($request->total_tickets < $soldTickets) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Cannot reduce total tickets below sold tickets ({$soldTickets})",
+                        'errors' => [
+                            'total_tickets' => ["Total tickets cannot be less than sold tickets ({$soldTickets})"]
+                        ]
+                    ], 422);
+                }
 
-        // Samo ažurirati polja koja postoje u bazi
-        $event->update($request->only([
-            'name', 'description', 'image_url', 'thumbnail_url',
-            'start_date', 'end_date', 'location', 'price',
-            'total_tickets', 'category_id'
-        ]));
+                // Update available tickets proportionally
+                if ($request->has('available_tickets')) {
+                    $event->available_tickets = $request->available_tickets;
+                } else {
+                    // Calculate new available tickets
+                    $newAvailable = $request->total_tickets - $soldTickets;
+                    $event->available_tickets = max(0, $newAvailable);
+                }
+            }
 
-        $event->load('category');
+            // Update only provided fields
+            $updateData = $request->only([
+                'name', 'description', 'image_url', 'thumbnail_url',
+                'start_date', 'end_date', 'location', 'price',
+                'total_tickets', 'category_id', 'featured'
+            ]);
 
-        return response()->json([
-            'message' => 'Event updated successfully',
-            'event' => $event
-        ]);
+            $event->update($updateData);
+            $event->load('category');
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Event updated successfully',
+                'data' => new EventResource($event)
+            ]);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Event not found',
+                'data' => null
+            ], 404);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error updating event',
+                'data' => null
+            ], 500);
+        }
     }
+
 
 /**
      * @OA\Delete(

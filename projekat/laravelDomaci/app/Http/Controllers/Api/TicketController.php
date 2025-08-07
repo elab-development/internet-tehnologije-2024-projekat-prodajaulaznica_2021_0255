@@ -70,12 +70,14 @@ class TicketController extends Controller
             'discount_percentage' => 'nullable|numeric|min:0|max:100'
         ]);
 
+
         try {
             DB::beginTransaction();
 
+
             $event = Event::lockForUpdate()->findOrFail($request->event_id);
 
-            // Check if event is available for purchase
+
             if (!$event->canPurchaseTickets()) {
                 return response()->json([
                     'success' => false,
@@ -83,7 +85,7 @@ class TicketController extends Controller
                 ], 422);
             }
 
-            // Check ticket availability
+
             if (!$event->hasAvailableTickets()) {
                 return response()->json([
                     'success' => false,
@@ -91,11 +93,14 @@ class TicketController extends Controller
                 ], 422);
             }
 
+
             $discountPercentage = $request->discount_percentage ?? 0;
             $finalPrice = $event->price * (1 - $discountPercentage / 100);
 
+
             $ticketNumber = $this->generateTicketNumber();
             $qrCodeData = $this->generateQRCodeData($ticketNumber, $event, auth()->user());
+
 
             $ticket = Ticket::create([
                 'ticket_number' => $ticketNumber,
@@ -109,12 +114,27 @@ class TicketController extends Controller
                 'user_id' => auth()->id()
             ]);
 
-            // Update available tickets
-            $event->decrement('available_tickets');
 
+            $event->decrement('available_tickets');
             $ticket->load(['event.category', 'user']);
 
+
+            // Send email notification
+            try {
+                Mail::to($ticket->user->email)->send(
+                    new TicketPurchaseConfirmation($ticket, $qrCodeData['qr_path'])
+                );
+            } catch (\Exception $e) {
+                \Log::error('Failed to send purchase confirmation email', [
+                    'ticket_id' => $ticket->id,
+                    'error' => $e->getMessage()
+                ]);
+                // Don't fail the purchase if email fails
+            }
+
+
             DB::commit();
+
 
             return response()->json([
                 'success' => true,
@@ -122,15 +142,17 @@ class TicketController extends Controller
                 'data' => new TicketResource($ticket)
             ], 201);
 
+
         } catch (\Exception $e) {
             DB::rollback();
-           
+            
             return response()->json([
                 'success' => false,
                 'message' => 'Error purchasing ticket: ' . $e->getMessage()
             ], 500);
         }
     }
+
 
     private function generateTicketNumber(): string
     {
@@ -1567,81 +1589,98 @@ class TicketController extends Controller
      *     )
      * )
      */
-    public function cancel($id): JsonResponse
-    {
-        try {
-            DB::beginTransaction();
+   public function cancel($id): JsonResponse
+{
+    try {
+        DB::beginTransaction();
 
-            $ticket = Ticket::with(['event', 'user'])
-                ->where('user_id', auth()->id())
-                ->findOrFail($id);
 
-            // Check if ticket can be cancelled
-            $cancellationResult = $this->canCancelTicket($ticket);
-           
-            if (!$cancellationResult['can_cancel']) {
-                return response()->json([
-                    'success' => false,
-                    'message' => $cancellationResult['reason'],
-                    'data' => [
-                        'ticket' => new TicketResource($ticket),
-                        'cancellation_info' => $cancellationResult
-                    ]
-                ], 422);
-            }
+        $ticket = Ticket::with(['event', 'user'])
+            ->where('user_id', auth()->id())
+            ->findOrFail($id);
 
-            // Calculate refund amount
-            $refundInfo = $this->calculateRefund($ticket);
 
-            // Mark ticket as cancelled
-            $ticket->update([
-                'status' => 'cancelled',
-                'cancelled_at' => now(),
-                'refund_amount' => $refundInfo['refund_amount'],
-                'cancellation_fee' => $refundInfo['cancellation_fee']
-            ]);
-
-            // Return available tickets to the event
-            $ticket->event->increment('available_tickets');
-
-            // Log the cancellation
-            \Log::info('Ticket cancelled', [
-                'ticket_id' => $ticket->id,
-                'ticket_number' => $ticket->ticket_number,
-                'user_id' => $ticket->user_id,
-                'event_id' => $ticket->event_id,
-                'refund_amount' => $refundInfo['refund_amount'],
-                'cancellation_fee' => $refundInfo['cancellation_fee'],
-                'cancelled_at' => now()
-            ]);
-
-            DB::commit();
-
+        $cancellationResult = $this->canCancelTicket($ticket);
+        
+        if (!$cancellationResult['can_cancel']) {
             return response()->json([
-                'success' => true,
-                'message' => 'Ticket cancelled successfully',
+                'success' => false,
+                'message' => $cancellationResult['reason'],
                 'data' => [
                     'ticket' => new TicketResource($ticket),
-                    'refund_info' => $refundInfo
+                    'cancellation_info' => $cancellationResult
                 ]
-            ]);
-
-        } catch (ModelNotFoundException $e) {
-            DB::rollback();
-            return response()->json([
-                'success' => false,
-                'message' => 'Ticket not found',
-                'data' => null
-            ], 404);
-        } catch (\Exception $e) {
-            DB::rollback();
-            return response()->json([
-                'success' => false,
-                'message' => 'Error cancelling ticket',
-                'data' => null
-            ], 500);
+            ], 422);
         }
+
+
+        $refundInfo = $this->calculateRefund($ticket);
+
+
+        $ticket->update([
+            'status' => 'cancelled',
+            'cancelled_at' => now(),
+            'refund_amount' => $refundInfo['refund_amount'],
+            'cancellation_fee' => $refundInfo['cancellation_fee']
+        ]);
+
+
+        $ticket->event->increment('available_tickets');
+
+
+        // Send cancellation email
+        try {
+            Mail::to($ticket->user->email)->send(
+                new TicketCancellationConfirmation($ticket, $refundInfo)
+            );
+        } catch (\Exception $e) {
+            \Log::error('Failed to send cancellation confirmation email', [
+                'ticket_id' => $ticket->id,
+                'error' => $e->getMessage()
+            ]);
+        }
+
+
+        \Log::info('Ticket cancelled', [
+            'ticket_id' => $ticket->id,
+            'ticket_number' => $ticket->ticket_number,
+            'user_id' => $ticket->user_id,
+            'event_id' => $ticket->event_id,
+            'refund_amount' => $refundInfo['refund_amount'],
+            'cancellation_fee' => $refundInfo['cancellation_fee'],
+            'cancelled_at' => now()
+        ]);
+
+
+        DB::commit();
+
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Ticket cancelled successfully',
+            'data' => [
+                'ticket' => new TicketResource($ticket),
+                'refund_info' => $refundInfo
+            ]
+        ]);
+
+
+    } catch (ModelNotFoundException $e) {
+        DB::rollback();
+        return response()->json([
+            'success' => false,
+            'message' => 'Ticket not found',
+            'data' => null
+        ], 404);
+    } catch (\Exception $e) {
+        DB::rollback();
+        return response()->json([
+            'success' => false,
+            'message' => 'Error cancelling ticket',
+            'data' => null
+        ], 500);
     }
+}
 
     /**
      * Check if ticket can be cancelled

@@ -4,6 +4,7 @@ import InputField from "../common/InputField";
 import Modal from "../common/Modal";
 import Pagination from "../common/Pagination";
 import TicketCancellation from "./TicketCancellation";
+import QRCodeDisplay from "./QRCodeDisplay";
 import { useAuth } from "../../context/AuthContext";
 import apiService from "../../services/api";
 
@@ -14,6 +15,7 @@ const UserTicketsDashboard = () => {
   const [error, setError] = useState("");
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [cancellingTicket, setCancellingTicket] = useState(null);
+  const [showingQRCode, setShowingQRCode] = useState(null);
   const [filters, setFilters] = useState({
     status: "all",
     search: "",
@@ -439,6 +441,7 @@ Molimo sačuvajte ovu kartu za ulaz na događaj.
                   onViewDetails={() => setSelectedTicket(ticket)}
                   onCancel={() => handleCancelTicket(ticket)}
                   onDownload={() => handleDownloadTicket(ticket)}
+                  onShowQR={() => setShowingQRCode(ticket)}
                   canCancelTicket={canCancelTicket}
                   isEventStartingSoon={isEventStartingSoon}
                   formatDate={formatDate}
@@ -490,6 +493,13 @@ Molimo sačuvajte ovu kartu za ulaz na događaj.
         onClose={() => setCancellingTicket(null)}
         onSuccess={handleCancellationSuccess}
       />
+
+      {/* QR code modal */}
+      <QRCodeDisplay
+        ticket={showingQRCode}
+        isOpen={!!showingQRCode}
+        onClose={() => setShowingQRCode(null)}
+      />
     </div>
   );
 };
@@ -500,6 +510,7 @@ const TicketCard = ({
   onViewDetails,
   onCancel,
   onDownload,
+  onShowQR,
   canCancelTicket,
   isEventStartingSoon,
   formatDate,
@@ -615,6 +626,10 @@ const TicketCard = ({
 
         <Button size="small" variant="outline" onClick={onDownload}>
           Preuzmi
+        </Button>
+
+        <Button size="small" variant="outline" onClick={onShowQR}>
+          QR kod
         </Button>
 
         {canCancelTicket(ticket) && (

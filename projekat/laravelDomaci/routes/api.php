@@ -36,6 +36,7 @@ Route::get('categories/{id}/statistics', [CategoryController::class, 'getStatist
 Route::get('tickets/validate/{ticketNumber}', [TicketController::class, 'validateTicket']);
 Route::post('tickets/validate/bulk', [TicketController::class, 'validateBulk']);
 Route::get('events/{eventId}/cancellation-policy', [TicketController::class, 'getCancellationPolicy']);
+Route::post('tickets/validate-qr', [TicketController::class, 'validateQRCode']);
 
 // Protected routes (authentication required)
 Route::middleware('auth:sanctum')->group(function () {
@@ -64,8 +65,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // Enhanced ticket management
     Route::get('tickets/stats', [TicketController::class, 'getTicketStats']);
     Route::get('tickets/{id}/download', [TicketController::class, 'downloadTicket']);
-
-
+     // QR code management
+    Route::get('tickets/{id}/qr-code', [TicketController::class, 'getQRCode']);
+    Route::get('tickets/{id}/pdf', [TicketController::class, 'generateTicketPDF']);
 });
 
 // Debug route for testing

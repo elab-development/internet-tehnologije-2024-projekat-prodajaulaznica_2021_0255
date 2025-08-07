@@ -8,9 +8,10 @@ class Ticket extends Model
 {
     use HasFactory;
 
-    protected $fillable = [
+   protected $fillable = [
         'ticket_number',
         'qr_code',
+        'qr_code_path',
         'price',
         'discount_percentage',
         'status',
@@ -23,6 +24,7 @@ class Ticket extends Model
         'event_id',
         'user_id'
     ];
+
 
     protected $casts = [
         'purchase_date' => 'datetime',

@@ -11,6 +11,8 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use App\Http\Resources\TicketResource;
+use SimpleSoftwareIO\QrCode\Facades\QrCode;
+use Illuminate\Support\Facades\Storage;
 
 class TicketController extends Controller
 {
@@ -18,11 +20,11 @@ class TicketController extends Controller
      * @OA\Post(
      *     path="/api/tickets/purchase",
      *     summary="Purchase a ticket for an event",
-     *     description="Purchases a ticket for a specific event. Requires the event to be valid and have available tickets. Optionally applies a discount percentage.",
+     *     description="Purchases a ticket for a specific event with QR code generation. Requires the event to be valid and have available tickets. Optionally applies a discount percentage.",
      *     operationId="purchaseTicket",
      *     tags={"Tickets"},
      *     security={{"sanctum":{}}},
-     *     
+     *    
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(
@@ -31,7 +33,7 @@ class TicketController extends Controller
      *             @OA\Property(property="discount_percentage", type="number", format="float", minimum=0, maximum=100, example=10, nullable=true, description="Optional discount percentage to apply")
      *         )
      *     ),
-     *     
+     *    
      *     @OA\Response(
      *         response=201,
      *         description="Ticket purchased successfully",
@@ -41,7 +43,7 @@ class TicketController extends Controller
      *             @OA\Property(property="data", ref="#/components/schemas/TicketResource")
      *         )
      *     ),
-     *     
+     *    
      *     @OA\Response(
      *         response=422,
      *         description="Validation failed or event not purchasable",
@@ -50,7 +52,7 @@ class TicketController extends Controller
      *             @OA\Property(property="message", type="string", example="No tickets available for this event")
      *         )
      *     ),
-     *     
+     *    
      *     @OA\Response(
      *         response=500,
      *         description="Server error while purchasing ticket",
@@ -92,9 +94,13 @@ class TicketController extends Controller
             $discountPercentage = $request->discount_percentage ?? 0;
             $finalPrice = $event->price * (1 - $discountPercentage / 100);
 
+            $ticketNumber = $this->generateTicketNumber();
+            $qrCodeData = $this->generateQRCodeData($ticketNumber, $event, auth()->user());
+
             $ticket = Ticket::create([
-                'ticket_number' => $this->generateTicketNumber(),
-                'qr_code' => Str::uuid(),
+                'ticket_number' => $ticketNumber,
+                'qr_code' => $qrCodeData['qr_string'],
+                'qr_code_path' => $qrCodeData['qr_path'],
                 'price' => $finalPrice,
                 'discount_percentage' => $discountPercentage,
                 'status' => 'active',
@@ -118,7 +124,7 @@ class TicketController extends Controller
 
         } catch (\Exception $e) {
             DB::rollback();
-            
+           
             return response()->json([
                 'success' => false,
                 'message' => 'Error purchasing ticket: ' . $e->getMessage()
@@ -136,6 +142,357 @@ class TicketController extends Controller
     }
 
     /**
+     * Generate QR code data and image
+     */
+    private function generateQRCodeData(string $ticketNumber, Event $event, $user): array
+    {
+        // Create QR code data structure
+        $qrData = [
+            'ticket_number' => $ticketNumber,
+            'event_id' => $event->id,
+            'event_name' => $event->name,
+            'event_date' => $event->start_date->toISOString(),
+            'location' => $event->location,
+            'user_id' => $user->id,
+            'user_name' => $user->name,
+            'generated_at' => now()->toISOString(),
+            'validation_url' => url("/api/tickets/validate/{$ticketNumber}")
+        ];
+
+        // Convert to JSON string
+        $qrString = json_encode($qrData);
+
+        // Generate QR code image
+        $qrCodeImage = QrCode::format('png')
+            ->size(300)
+            ->margin(2)
+            ->errorCorrection('M')
+            ->generate($qrString);
+
+        // Save QR code image to storage
+        $fileName = "qr-codes/{$ticketNumber}.png";
+        Storage::disk('public')->put($fileName, $qrCodeImage);
+
+        return [
+            'qr_string' => $qrString,
+            'qr_path' => $fileName,
+            'qr_url' => Storage::disk('public')->url($fileName)
+        ];
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/tickets/{id}/qr-code",
+     *     summary="Get QR code for a ticket",
+     *     description="Retrieves the QR code image and data for a specific ticket owned by the authenticated user",
+     *     operationId="getQRCode",
+     *     tags={"Tickets"},
+     *     security={{"sanctum":{}}},
+     *    
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="Ticket ID",
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
+     *    
+     *     @OA\Response(
+     *         response=200,
+     *         description="QR code retrieved successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="QR code retrieved successfully"),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="qr_code_url", type="string", example="https://example.com/storage/qr-codes/TKT-ABC12345.png"),
+     *                 @OA\Property(property="qr_code_data", type="object",
+     *                     @OA\Property(property="ticket_number", type="string", example="TKT-ABC12345"),
+     *                     @OA\Property(property="event_id", type="integer", example=1),
+     *                     @OA\Property(property="event_name", type="string", example="Summer Music Festival"),
+     *                     @OA\Property(property="event_date", type="string", format="date-time"),
+     *                     @OA\Property(property="location", type="string", example="Central Park"),
+     *                     @OA\Property(property="user_id", type="integer", example=1),
+     *                     @OA\Property(property="user_name", type="string", example="John Doe"),
+     *                     @OA\Property(property="generated_at", type="string", format="date-time"),
+     *                     @OA\Property(property="validation_url", type="string", example="https://example.com/api/tickets/validate/TKT-ABC12345")
+     *                 ),
+     *                 @OA\Property(property="ticket_number", type="string", example="TKT-ABC12345")
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Ticket not found",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Ticket not found"),
+     *             @OA\Property(property="data", type="null")
+     *         )
+     *     )
+     * )
+     */
+    public function getQRCode($id): JsonResponse
+    {
+        try {
+            $ticket = Ticket::with(['event', 'user'])
+                ->where('user_id', auth()->id())
+                ->findOrFail($id);
+
+            if (!$ticket->qr_code_path || !Storage::disk('public')->exists($ticket->qr_code_path)) {
+                // Regenerate QR code if missing
+                $qrCodeData = $this->generateQRCodeData(
+                    $ticket->ticket_number, 
+                    $ticket->event, 
+                    $ticket->user
+                );
+                
+                $ticket->update([
+                    'qr_code' => $qrCodeData['qr_string'],
+                    'qr_code_path' => $qrCodeData['qr_path']
+                ]);
+            }
+
+            $qrCodeUrl = Storage::disk('public')->url($ticket->qr_code_path);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'QR code retrieved successfully',
+                'data' => [
+                    'qr_code_url' => $qrCodeUrl,
+                    'qr_code_data' => json_decode($ticket->qr_code, true),
+                    'ticket_number' => $ticket->ticket_number
+                ]
+            ]);
+
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Ticket not found',
+                'data' => null
+            ], 404);
+        }
+    }
+
+    /**
+     * @OA\Post(
+     *     path="/api/tickets/validate/qr-code",
+     *     summary="Validate a ticket using QR code data",
+     *     description="Validates a ticket by scanning and decoding QR code data. Verifies data integrity and ticket status.",
+     *     operationId="validateQRCode",
+     *     tags={"Tickets"},
+     *     security={{"sanctum":{}}},
+     *    
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"qr_data"},
+     *             @OA\Property(property="qr_data", type="string", description="JSON string from QR code scan", example="{\"ticket_number\":\"TKT-ABC12345\",\"event_id\":1,\"event_name\":\"Summer Music Festival\"}")
+     *         )
+     *     ),
+     *    
+     *     @OA\Response(
+     *         response=200,
+     *         description="QR code validation completed",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Valid ticket"),
+     *             @OA\Property(property="valid", type="boolean", example=true),
+     *             @OA\Property(property="data", ref="#/components/schemas/TicketResource"),
+     *             @OA\Property(property="qr_data", type="object",
+     *                 @OA\Property(property="ticket_number", type="string", example="TKT-ABC12345"),
+     *                 @OA\Property(property="event_id", type="integer", example=1),
+     *                 @OA\Property(property="event_name", type="string", example="Summer Music Festival")
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=400,
+     *         description="Invalid QR code format or data mismatch",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Invalid QR code format"),
+     *             @OA\Property(property="valid", type="boolean", example=false)
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Ticket not found",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Ticket not found"),
+     *             @OA\Property(property="valid", type="boolean", example=false)
+     *         )
+     *     )
+     * )
+     */
+    public function validateQRCode(Request $request): JsonResponse
+    {
+        $request->validate([
+            'qr_data' => 'required|string'
+        ]);
+
+        try {
+            $qrData = json_decode($request->qr_data, true);
+            
+            if (!$qrData || !isset($qrData['ticket_number'])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid QR code format',
+                    'valid' => false
+                ], 400);
+            }
+
+            $ticket = Ticket::with(['event.category', 'user'])
+                ->where('ticket_number', $qrData['ticket_number'])
+                ->first();
+
+            if (!$ticket) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Ticket not found',
+                    'valid' => false
+                ], 404);
+            }
+
+            // Verify QR code data integrity
+            $storedQrData = json_decode($ticket->qr_code, true);
+            if ($storedQrData['ticket_number'] !== $qrData['ticket_number'] ||
+                $storedQrData['event_id'] !== $qrData['event_id']) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'QR code data mismatch',
+                    'valid' => false
+                ], 400);
+            }
+
+            // Validate ticket status
+            $validationResult = $this->validateTicketStatus($ticket);
+
+            return response()->json([
+                'success' => true,
+                'message' => $validationResult['message'],
+                'valid' => $validationResult['valid'],
+                'data' => $validationResult['valid'] ? new TicketResource($ticket) : null,
+                'qr_data' => $qrData
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error validating QR code',
+                'valid' => false
+            ], 500);
+        }
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/tickets/{id}/pdf",
+     *     summary="Generate ticket PDF data",
+     *     description="Retrieves ticket data formatted for PDF generation including QR code URL and all necessary ticket information",
+     *     operationId="generateTicketPDF",
+     *     tags={"Tickets"},
+     *     security={{"sanctum":{}}},
+     *    
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="Ticket ID",
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
+     *    
+     *     @OA\Response(
+     *         response=200,
+     *         description="Ticket data for PDF generation retrieved successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Ticket data for PDF generation"),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="ticket_number", type="string", example="TKT-ABC12345"),
+     *                 @OA\Property(property="qr_code_url", type="string", example="https://example.com/storage/qr-codes/TKT-ABC12345.png"),
+     *                 @OA\Property(property="event", type="object",
+     *                     @OA\Property(property="name", type="string", example="Summer Music Festival"),
+     *                     @OA\Property(property="date", type="string", example="15.08.2024"),
+     *                     @OA\Property(property="time", type="string", example="19:00"),
+     *                     @OA\Property(property="location", type="string", example="Central Park"),
+     *                     @OA\Property(property="category", type="string", example="Music")
+     *                 ),
+     *                 @OA\Property(property="user", type="object",
+     *                     @OA\Property(property="name", type="string", example="John Doe"),
+     *                     @OA\Property(property="email", type="string", example="john@example.com")
+     *                 ),
+     *                 @OA\Property(property="price", type="number", format="float", example=75.50),
+     *                 @OA\Property(property="purchase_date", type="string", example="10.08.2024 14:30"),
+     *                 @OA\Property(property="status", type="string", example="active")
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Ticket not found",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Ticket not found")
+     *         )
+     *     )
+     * )
+     */
+    public function generateTicketPDF($id): JsonResponse
+    {
+        try {
+            $ticket = Ticket::with(['event.category', 'user'])
+                ->where('user_id', auth()->id())
+                ->findOrFail($id);
+
+            // Ensure QR code exists
+            if (!$ticket->qr_code_path || !Storage::disk('public')->exists($ticket->qr_code_path)) {
+                $qrCodeData = $this->generateQRCodeData(
+                    $ticket->ticket_number, 
+                    $ticket->event, 
+                    $ticket->user
+                );
+                
+                $ticket->update([
+                    'qr_code' => $qrCodeData['qr_string'],
+                    'qr_code_path' => $qrCodeData['qr_path']
+                ]);
+            }
+
+            $ticketData = [
+                'ticket_number' => $ticket->ticket_number,
+                'qr_code_url' => Storage::disk('public')->url($ticket->qr_code_path),
+                'event' => [
+                    'name' => $ticket->event->name,
+                    'date' => $ticket->event->start_date->format('d.m.Y'),
+                    'time' => $ticket->event->start_date->format('H:i'),
+                    'location' => $ticket->event->location,
+                    'category' => $ticket->event->category->name
+                ],
+                'user' => [
+                    'name' => $ticket->user->name,
+                    'email' => $ticket->user->email
+                ],
+                'price' => $ticket->price,
+                'purchase_date' => $ticket->purchase_date->format('d.m.Y H:i'),
+                'status' => $ticket->status
+            ];
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Ticket data for PDF generation',
+                'data' => $ticketData
+            ]);
+
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Ticket not found'
+            ], 404);
+        }
+    }
+
+    /**
      * @OA\Get(
      *     path="/api/tickets/my",
      *     summary="Get tickets for the authenticated user with filtering and pagination",
@@ -143,7 +500,7 @@ class TicketController extends Controller
      *     operationId="myTickets",
      *     tags={"Tickets"},
      *     security={{"sanctum":{}}},
-     *     
+     *    
      *     @OA\Parameter(
      *         name="status",
      *         in="query",
@@ -186,7 +543,7 @@ class TicketController extends Controller
      *         required=false,
      *         @OA\Schema(type="integer", minimum=1, default=1)
      *     ),
-     *     
+     *    
      *     @OA\Response(
      *         response=200,
      *         description="User tickets retrieved successfully",
@@ -212,7 +569,7 @@ class TicketController extends Controller
      *             )
      *         )
      *     ),
-     *     
+     *    
      *     @OA\Response(
      *         response=500,
      *         description="Server error",
@@ -300,7 +657,7 @@ class TicketController extends Controller
     private function getUserTicketStats($userId): array
     {
         $tickets = Ticket::where('user_id', $userId);
-        
+       
         return [
             'total' => $tickets->count(),
             'active' => $tickets->where('status', 'active')->count(),
@@ -322,7 +679,7 @@ class TicketController extends Controller
      *     operationId="getTicketStats",
      *     tags={"Tickets"},
      *     security={{"sanctum":{}}},
-     *     
+     *    
      *     @OA\Response(
      *         response=200,
      *         description="Ticket statistics retrieved successfully",
@@ -343,7 +700,7 @@ class TicketController extends Controller
      *             )
      *         )
      *     ),
-     *     
+     *    
      *     @OA\Response(
      *         response=500,
      *         description="Server error",
@@ -360,7 +717,7 @@ class TicketController extends Controller
         try {
             $userId = auth()->id();
             $stats = $this->getUserTicketStats($userId);
-            
+           
             // Add additional stats
             $recentTickets = Ticket::with('event')
                 ->where('user_id', $userId)
@@ -405,7 +762,7 @@ class TicketController extends Controller
      *     operationId="showTicket",
      *     tags={"Tickets"},
      *     security={{"sanctum":{}}},
-     *     
+     *    
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
@@ -413,7 +770,7 @@ class TicketController extends Controller
      *         description="Ticket ID",
      *         @OA\Schema(type="integer", example=1)
      *     ),
-     *     
+     *    
      *     @OA\Response(
      *         response=200,
      *         description="Ticket details retrieved successfully",
@@ -457,7 +814,7 @@ class TicketController extends Controller
      *     operationId="downloadTicket",
      *     tags={"Tickets"},
      *     security={{"sanctum":{}}},
-     *     
+     *    
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
@@ -465,7 +822,7 @@ class TicketController extends Controller
      *         description="Ticket ID",
      *         @OA\Schema(type="integer", example=1)
      *     ),
-     *     
+     *    
      *     @OA\Response(
      *         response=200,
      *         description="Ticket data retrieved for download",
@@ -551,7 +908,7 @@ class TicketController extends Controller
      *     operationId="cancelTicket",
      *     tags={"Tickets"},
      *     security={{"sanctum":{}}},
-     *     
+     *    
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
@@ -559,7 +916,7 @@ class TicketController extends Controller
      *         description="Ticket ID",
      *         @OA\Schema(type="integer", example=1)
      *     ),
-     *     
+     *    
      *     @OA\Response(
      *         response=200,
      *         description="Ticket cancelled successfully",
@@ -627,7 +984,7 @@ class TicketController extends Controller
 
             // Check if ticket can be cancelled
             $cancellationResult = $this->canCancelTicket($ticket);
-            
+           
             if (!$cancellationResult['can_cancel']) {
                 return response()->json([
                     'success' => false,
@@ -765,14 +1122,14 @@ class TicketController extends Controller
         $originalPrice = $ticket->price;
         $event = $ticket->event;
         $now = now();
-        
+       
         // Calculate hours until event
         $hoursUntilEvent = $now->diffInHours($event->start_date);
-        
+       
         // Cancellation fee structure
         $cancellationFeePercentage = 0;
         $refundPercentage = 100;
-        
+       
         if ($hoursUntilEvent >= 168) { // 7 days or more
             $cancellationFeePercentage = 5; // 5% fee
             $refundPercentage = 95;
@@ -787,10 +1144,10 @@ class TicketController extends Controller
             $cancellationFeePercentage = 100;
             $refundPercentage = 0;
         }
-        
+       
         $cancellationFee = $originalPrice * ($cancellationFeePercentage / 100);
         $refundAmount = $originalPrice * ($refundPercentage / 100);
-        
+       
         return [
             'original_price' => $originalPrice,
             'cancellation_fee_percentage' => $cancellationFeePercentage,
@@ -825,7 +1182,7 @@ class TicketController extends Controller
      *     description="Retrieves the detailed cancellation policy including fee structure and general rules for a specific event",
      *     operationId="getCancellationPolicy",
      *     tags={"Tickets"},
-     *     
+     *    
      *     @OA\Parameter(
      *         name="eventId",
      *         in="path",
@@ -833,7 +1190,7 @@ class TicketController extends Controller
      *         description="Event ID",
      *         @OA\Schema(type="integer", example=1)
      *     ),
-     *     
+     *    
      *     @OA\Response(
      *         response=200,
      *         description="Cancellation policy retrieved successfully",
@@ -872,7 +1229,7 @@ class TicketController extends Controller
     {
         try {
             $event = Event::findOrFail($eventId);
-            
+           
             $policy = [
                 'general_rules' => [
                     'Tickets can be cancelled up to 24 hours before the event',
@@ -930,7 +1287,7 @@ class TicketController extends Controller
      *     description="Validates a ticket using its ticket number and returns detailed validation status",
      *     operationId="validateTicket",
      *     tags={"Tickets"},
-     *     
+     *    
      *     @OA\Parameter(
      *         name="ticketNumber",
      *         in="path",
@@ -938,7 +1295,7 @@ class TicketController extends Controller
      *         description="Ticket number (e.g., TKT-ABC12345)",
      *         @OA\Schema(type="string", example="TKT-ABC12345")
      *     ),
-     *     
+     *    
      *     @OA\Response(
      *         response=200,
      *         description="Ticket validation completed",
@@ -1020,7 +1377,7 @@ class TicketController extends Controller
     {
         $now = now();
         $event = $ticket->event;
-        
+       
         // Check ticket status
         if ($ticket->status !== 'active') {
             return [
@@ -1094,7 +1451,7 @@ class TicketController extends Controller
      *     operationId="validateBulk",
      *     tags={"Tickets"},
      *     security={{"sanctum":{}}},
-     *     
+     *    
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(
@@ -1108,7 +1465,7 @@ class TicketController extends Controller
      *             )
      *         )
      *     ),
-     *     
+     *    
      *     @OA\Response(
      *         response=200,
      *         description="Bulk validation completed",
@@ -1130,7 +1487,7 @@ class TicketController extends Controller
      *             )
      *         )
      *     ),
-     *     
+     *    
      *     @OA\Response(
      *         response=422,
      *         description="Validation error",
@@ -1149,7 +1506,7 @@ class TicketController extends Controller
         ]);
 
         $results = [];
-        
+       
         foreach ($request->ticket_numbers as $ticketNumber) {
             $ticket = Ticket::with(['event.category', 'user'])
                 ->where('ticket_number', $ticketNumber)
@@ -1193,7 +1550,7 @@ class TicketController extends Controller
      *     operationId="markAsUsed",
      *     tags={"Tickets"},
      *     security={{"sanctum":{}}},
-     *     
+     *    
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
@@ -1201,7 +1558,7 @@ class TicketController extends Controller
      *         description="Ticket ID",
      *         @OA\Schema(type="integer", example=1)
      *     ),
-     *     
+     *    
      *     @OA\Response(
      *         response=200,
      *         description="Ticket marked as used successfully",
@@ -1250,7 +1607,7 @@ class TicketController extends Controller
 
             // Validate ticket before marking as used
             $validationResult = $this->validateTicketStatus($ticket);
-            
+           
             if (!$validationResult['valid']) {
                 return response()->json([
                     'success' => false,
@@ -1316,7 +1673,7 @@ class TicketController extends Controller
      *     operationId="getValidationStats",
      *     tags={"Tickets"},
      *     security={{"sanctum":{}}},
-     *     
+     *    
      *     @OA\Parameter(
      *         name="eventId",
      *         in="path",
@@ -1324,7 +1681,7 @@ class TicketController extends Controller
      *         description="Event ID",
      *         @OA\Schema(type="integer", example=1)
      *     ),
-     *     
+     *    
      *     @OA\Response(
      *         response=200,
      *         description="Validation statistics retrieved successfully",
@@ -1363,7 +1720,7 @@ class TicketController extends Controller
     {
         try {
             $event = Event::findOrFail($eventId);
-            
+           
             $stats = [
                 'total_tickets' => $event->tickets()->count(),
                 'active_tickets' => $event->tickets()->where('status', 'active')->count(),

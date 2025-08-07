@@ -315,6 +315,19 @@ export const apiService = {
   getCancellationPolicy: async (eventId) => {
     return await api.get(`/events/${eventId}/cancellation-policy`);
   },
+
+  // QR Code management
+  getTicketQRCode: async (ticketId) => {
+    return await api.get(`/tickets/${ticketId}/qr-code`);
+  },
+
+  generateTicketPDF: async (ticketId) => {
+    return await api.get(`/tickets/${ticketId}/pdf`);
+  },
+
+  validateQRCode: async (qrData) => {
+    return await api.post("/tickets/validate-qr", { qr_data: qrData });
+  },
 };
 
 export default apiService;

@@ -25,6 +25,8 @@ class EventResource extends JsonResource
             'category' => new CategoryResource($this->whenLoaded('category')),
             'is_active' => $this->isActive(),
             'can_purchase' => $this->canPurchaseTickets(),
+            'featured' => $this->featured ?? false,
+            'tickets_count' => $this->when($this->relationLoaded('tickets'), $this->tickets->count()),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

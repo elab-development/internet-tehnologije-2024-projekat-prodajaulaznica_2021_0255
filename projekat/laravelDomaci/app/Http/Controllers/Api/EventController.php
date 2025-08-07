@@ -226,34 +226,75 @@ public function index(Request $request): JsonResponse
         ], 201);
     }
 
- /**
+    /**
      * @OA\Get(
-     *     path="/api/events/{id}",
-     *     summary="Get a specific event by ID",
-     *     tags={"Events"},
-     *     @OA\Parameter(
-     *         name="id",
-     *         in="path",
-     *         required=true,
-     *         @OA\Schema(type="integer")
-     *     ),
-     *     @OA\Response(response=200, description="Event found"),
-     *     @OA\Response(response=404, description="Event not found")
+     * path="/api/events/{id}",
+     * summary="Get a single event by ID",
+     * tags={"Events"},
+     * @OA\Parameter(
+     * name="id",
+     * in="path",
+     * required=true,
+     * description="ID of the event to retrieve",
+     * @OA\Schema(type="integer")
+     * ),
+     * @OA\Response(
+     * response=200,
+     * description="Event retrieved successfully",
+     * @OA\JsonContent(
+     * @OA\Property(property="success", type="boolean", example=true),
+     * @OA\Property(property="message", type="string", example="Event retrieved successfully"),
+     * @OA\Property(property="data", ref="#/components/schemas/EventResource")
+     * )
+     * ),
+     * @OA\Response(
+     * response=404,
+     * description="Event not found",
+     * @OA\JsonContent(
+     * @OA\Property(property="success", type="boolean", example=false),
+     * @OA\Property(property="message", type="string", example="Event not found"),
+     * @OA\Property(property="data", type="null")
+     * )
+     * ),
+     * @OA\Response(
+     * response=500,
+     * description="Error retrieving event",
+     * @OA\JsonContent(
+     * @OA\Property(property="success", type="boolean", example=false),
+     * @OA\Property(property="message", type="string", example="Error retrieving event"),
+     * @OA\Property(property="data", type="null")
+     * )
+     * )
      * )
      */
+    // Updated show method in EventController
     public function show($id): JsonResponse
     {
-        $event = Event::with('category')->findOrFail($id);
+        try {
+            $event = Event::with(['category', 'tickets' => function($query) {
+                $query->where('status', 'active');
+            }])->findOrFail($id);
 
-        if (!$event) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Event retrieved successfully',
+                'data' => new EventResource($event)
+            ]);
+        } catch (ModelNotFoundException $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Event not found'
-            ]);
+                'message' => 'Event not found',
+                'data' => null
+            ], 404);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error retrieving event',
+                'data' => null
+            ], 500);
         }
-
-        return response()->json($event);
     }
+ 
 
      /**
      * @OA\Put(

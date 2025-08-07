@@ -10,18 +10,19 @@ class Event extends Model
     use HasFactory;
 
     protected $fillable = [
-        'name',
-        'description',
-        'image_url',
-        'thumbnail_url',
-        'start_date',
-        'end_date',
-        'location',
-        'price',
-        'total_tickets',
-        'available_tickets',
-        'category_id'
-    ];
+    'name',
+    'description',
+    'image_url',
+    'thumbnail_url',
+    'start_date',
+    'end_date',
+    'location',
+    'price',
+    'total_tickets',
+    'available_tickets',
+    'category_id',
+    'featured'
+];
 
     protected $casts = [
         'start_date' => 'datetime',

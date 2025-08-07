@@ -381,6 +381,25 @@ export const apiService = {
   getUpcomingEvents: async () => {
     return await api.get("/admin/dashboard/upcoming-events");
   },
+
+  // Export functionality
+  exportEvents: async (format = "csv") => {
+    const response = await api.get(`/export/events?format=${format}`, {
+      responseType: "blob",
+    });
+    return response;
+  },
+
+  exportTickets: async (eventId = null, format = "csv") => {
+    const params = new URLSearchParams();
+    if (eventId) params.append("event_id", eventId);
+    params.append("format", format);
+
+    const response = await api.get(`/export/tickets?${params.toString()}`, {
+      responseType: "blob",
+    });
+    return response;
+  },
 };
 
 export default apiService;

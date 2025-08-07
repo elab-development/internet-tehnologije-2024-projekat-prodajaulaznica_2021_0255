@@ -18,6 +18,7 @@ const AdminEventsPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     if (isAdmin()) {
@@ -77,6 +78,30 @@ const AdminEventsPage = () => {
       alert("Greška pri brisanju događaja: " + error.message);
     } finally {
       setDeleteLoading(false);
+    }
+  };
+
+  const handleExport = async (format) => {
+    try {
+      setExporting(true);
+      const response = await apiService.exportEvents(format);
+
+      // Create download link
+      const url = window.URL.createObjectURL(new Blob([response]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute(
+        "download",
+        `events_${new Date().toISOString().split("T")[0]}.${format}`
+      );
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      alert("Greška pri eksportu: " + error.message);
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -145,9 +170,25 @@ const AdminEventsPage = () => {
             Ukupno događaja: {events.length}
           </p>
         </div>
-        <Button onClick={() => setShowCreateForm(true)}>
-          + Kreiraj novi događaj
-        </Button>
+        <div style={{ display: "flex", gap: "1rem" }}>
+          <Button
+            variant="outline"
+            onClick={() => handleExport("csv")}
+            disabled={exporting}
+          >
+            {exporting ? "Eksportovanje..." : "📊 Eksportuj CSV"}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => handleExport("html")}
+            disabled={exporting}
+          >
+            📄 Eksportuj HTML
+          </Button>
+          <Button onClick={() => setShowCreateForm(true)}>
+            + Kreiraj novi događaj
+          </Button>
+        </div>
       </div>
 
       {error && (

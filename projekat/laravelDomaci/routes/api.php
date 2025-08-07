@@ -55,7 +55,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('dashboard/upcoming-events', [AdminDashboardController::class, 'getUpcomingEvents']);
     });
 
-    
+    // Export routes
+    Route::get('export/events', [ExportController::class, 'exportEvents']);
+    Route::get('export/tickets', [ExportController::class, 'exportTickets']);
+
     // Events - CRUD operations for authenticated users
     Route::post('events', [EventController::class, 'store']);
     Route::put('events/{id}', [EventController::class, 'update']);

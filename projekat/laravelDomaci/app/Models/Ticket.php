@@ -76,4 +76,68 @@ class Ticket extends Model
     {
         return $this->original_price - $this->price;
     }
+
+    public function canBeUsed(): bool
+{
+    if ($this->status !== 'active') {
+        return false;
+    }
+
+    $now = now();
+    $event = $this->event;
+
+    // Check if event is within valid time window
+    $validFrom = $event->start_date->copy()->subHour();
+    $validUntil = $event->end_date;
+
+    return $now >= $validFrom && $now <= $validUntil;
+}
+
+public function getValidationInfo(): array
+{
+    $now = now();
+    $event = $this->event;
+    
+    if (!$event) {
+        return ['status' => 'no_event', 'message' => 'Event not found'];
+    }
+
+    if ($this->status !== 'active') {
+        return [
+            'status' => 'inactive',
+            'message' => 'Ticket is ' . $this->status,
+            'can_validate' => false
+        ];
+    }
+
+    $validFrom = $event->start_date->copy()->subHour();
+    $validUntil = $event->end_date;
+
+    if ($now < $validFrom) {
+        return [
+            'status' => 'too_early',
+            'message' => 'Validation opens 1 hour before event',
+            'valid_from' => $validFrom,
+            'can_validate' => false
+        ];
+    }
+
+    if ($now > $validUntil) {
+        return [
+            'status' => 'expired',
+            'message' => 'Event has ended',
+            'valid_until' => $validUntil,
+            'can_validate' => false
+        ];
+    }
+
+    return [
+        'status' => 'valid',
+        'message' => 'Ticket is valid for entry',
+        'valid_from' => $validFrom,
+        'valid_until' => $validUntil,
+        'can_validate' => true
+    ];
+}
+
 }

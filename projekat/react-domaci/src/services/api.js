@@ -227,8 +227,23 @@ export const apiService = {
     return await api.patch(`/tickets/${id}/cancel`);
   },
 
+  // Ticket validation methods
   validateTicket: async (ticketNumber) => {
     return await api.get(`/tickets/validate/${ticketNumber}`);
+  },
+
+  validateBulkTickets: async (ticketNumbers) => {
+    return await api.post("/tickets/validate/bulk", {
+      ticket_numbers: ticketNumbers,
+    });
+  },
+
+  markTicketAsUsed: async (ticketId) => {
+    return await api.patch(`/tickets/${ticketId}/use`);
+  },
+
+  getEventValidationStats: async (eventId) => {
+    return await api.get(`/events/${eventId}/validation-stats`);
   },
 
   // Discount validation (placeholder)

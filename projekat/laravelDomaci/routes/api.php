@@ -34,6 +34,7 @@ Route::get('categories/{id}/statistics', [CategoryController::class, 'getStatist
 
 // Public ticket validation
 Route::get('tickets/validate/{ticketNumber}', [TicketController::class, 'validateTicket']);
+Route::post('tickets/validate/bulk', [TicketController::class, 'validateBulk']);
 
 // Protected routes (authentication required)
 Route::middleware('auth:sanctum')->group(function () {
@@ -58,6 +59,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('tickets/{id}', [TicketController::class, 'show']);
     Route::patch('tickets/{id}/cancel', [TicketController::class, 'cancel']);
     Route::patch('tickets/{id}/use', [TicketController::class, 'markAsUsed']);
+    Route::get('events/{eventId}/validation-stats', [TicketController::class, 'getValidationStats']);
+
 });
 
 // Debug route for testing

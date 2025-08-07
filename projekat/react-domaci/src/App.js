@@ -14,6 +14,8 @@ import ProtectedRoute from "./components/common/ProtectedRoute/ProtectedRoute";
 import GuestRoute from "./components/common/GuestRoute/GuestRoute";
 import CategoriesPage from "./pages/CategoriesPage/CategoriesPage";
 import CategoryDetailsPage from "./pages/CategoryDetailsPage/CategoryDetailsPage";
+import AdminRoute from "./components/common/AdminRoute/AdminRoute";
+import AdminEventsPage from "./pages/AdminEventsPage/AdminEventsPage";
 import "./App.css";
 
 function App() {
@@ -86,6 +88,14 @@ function App() {
                 <Route
                   path="/categories/:id"
                   element={<CategoryDetailsPage />}
+                />
+                <Route
+                  path="/admin/events"
+                  element={
+                    <AdminRoute>
+                      <AdminEventsPage />
+                    </AdminRoute>
+                  }
                 />
               </Routes>
             </Layout>

@@ -11,51 +11,79 @@ use Illuminate\Support\Str;
 
 class TicketController extends Controller
 {
-    /**
-    * @OA\Tag(
-    *     name="Tickets",
-    *     description="Operations related to ticket management"
-    * )
-    */
+/**
+ * @OA\Post(
+ *     path="/api/tickets/purchase",
+ *     summary="Purchase a ticket for an event",
+ *     description="Purchases a ticket for a specific event. Requires the event to be valid and have available tickets. Optionally applies a discount percentage.",
+ *     operationId="purchaseTicket",
+ *     tags={"Tickets"},
+ *     security={{"sanctum":{}}},
+ *     
+ *     @OA\RequestBody(
+ *         required=true,
+ *         @OA\JsonContent(
+ *             required={"event_id"},
+ *             @OA\Property(property="event_id", type="integer", example=1, description="ID of the event"),
+ *             @OA\Property(property="discount_percentage", type="number", format="float", minimum=0, maximum=100, example=10, nullable=true)
+ *         )
+ *     ),
+ *     
+ *     @OA\Response(
+ *         response=201,
+ *         description="Ticket purchased successfully",
+ *         @OA\JsonContent(
+ *             @OA\Property(property="success", type="boolean", example=true),
+ *             @OA\Property(property="message", type="string", example="Ticket purchased successfully"),
+ *             @OA\Property(property="data", type="object", description="Ticket resource returned")
+ *         )
+ *     ),
+ *     
+ *     @OA\Response(
+ *         response=422,
+ *         description="Validation failed or event not purchasable",
+ *         @OA\JsonContent(
+ *             @OA\Property(property="success", type="boolean", example=false),
+ *             @OA\Property(property="message", type="string", example="No tickets available for this event")
+ *         )
+ *     ),
+ *     
+ *     @OA\Response(
+ *         response=500,
+ *         description="Server error while purchasing ticket",
+ *         @OA\JsonContent(
+ *             @OA\Property(property="success", type="boolean", example=false),
+ *             @OA\Property(property="message", type="string", example="Error purchasing ticket: Internal Server Error")
+ *         )
+ *     )
+ * )
+ */
 
-    /**
-     * @OA\Post(
-     *     path="/api/tickets/purchase",
-     *     summary="Purchase a ticket for an event",
-     *     tags={"Tickets"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             required={"event_id"},
-     *             @OA\Property(property="event_id", type="integer", example=1),
-     *             @OA\Property(property="discount_percentage", type="number", example=10)
-     *         )
-     *     ),
-     *     @OA\Response(response=201, description="Ticket purchased successfully"),
-     *     @OA\Response(response=422, description="Validation failed or no tickets available")
-     * )
-     */
-    public function purchaseTicket(Request $request): JsonResponse
-    {
-        $request->validate([
-            'event_id' => 'required|exists:events,id',
-            'discount_percentage' => 'nullable|numeric|min:0|max:100'
-        ]);
+public function purchaseTicket(Request $request): JsonResponse
+{
+    $request->validate([
+        'event_id' => 'required|exists:events,id',
+        'discount_percentage' => 'nullable|numeric|min:0|max:100'
+    ]);
 
-        $event = Event::findOrFail($request->event_id);
+    try {
+        DB::beginTransaction();
 
-        // Proveriti dostupnost ulaznica
-        if (!$event->hasAvailableTickets()) {
+        $event = Event::lockForUpdate()->findOrFail($request->event_id);
+
+        // Check if event is available for purchase
+        if (!$event->canPurchaseTickets()) {
             return response()->json([
-                'message' => 'No tickets available for this event'
+                'success' => false,
+                'message' => 'Cannot purchase tickets for this event'
             ], 422);
         }
 
-        // Proveriti da li je događaj još uvek aktivan za kupovinu
-        if (!$event->canPurchaseTickets()) {
+        // Check ticket availability
+        if (!$event->hasAvailableTickets()) {
             return response()->json([
-                'message' => 'Cannot purchase tickets for past events or events that have started'
+                'success' => false,
+                'message' => 'No tickets available for this event'
             ], 422);
         }
 
@@ -63,26 +91,47 @@ class TicketController extends Controller
         $finalPrice = $event->price * (1 - $discountPercentage / 100);
 
         $ticket = Ticket::create([
-            'ticket_number' => Ticket::generateTicketNumber(),
+            'ticket_number' => $this->generateTicketNumber(),
             'qr_code' => Str::uuid(),
             'price' => $finalPrice,
             'discount_percentage' => $discountPercentage,
             'status' => 'active',
             'purchase_date' => now(),
             'event_id' => $request->event_id,
-            'user_id' => $request->user()->id
+            'user_id' => auth()->id()
         ]);
 
-        // Ažurirati broj dostupnih ulaznica
+        // Update available tickets
         $event->decrement('available_tickets');
 
         $ticket->load(['event.category', 'user']);
 
+        DB::commit();
+
         return response()->json([
+            'success' => true,
             'message' => 'Ticket purchased successfully',
-            'ticket' => $ticket
+            'data' => new TicketResource($ticket)
         ], 201);
+
+    } catch (\Exception $e) {
+        DB::rollback();
+        
+        return response()->json([
+            'success' => false,
+            'message' => 'Error purchasing ticket: ' . $e->getMessage()
+        ], 500);
     }
+}
+
+private function generateTicketNumber(): string
+{
+    do {
+        $number = 'TKT-' . strtoupper(Str::random(8));
+    } while (Ticket::where('ticket_number', $number)->exists());
+
+    return $number;
+}
 
        /**
      * @OA\Get(

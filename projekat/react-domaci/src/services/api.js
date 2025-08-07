@@ -231,6 +231,30 @@ export const apiService = {
     return await api.get(`/tickets/validate/${ticketNumber}`);
   },
 
+  // Discount validation (placeholder)
+  validateDiscount: async (code) => {
+    // Simulate discount validation
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    const validCodes = {
+      STUDENT10: { percentage: 10, description: "Student popust" },
+      EARLY20: { percentage: 20, description: "Rani popust" },
+      VIP15: { percentage: 15, description: "VIP popust" },
+    };
+
+    if (validCodes[code.toUpperCase()]) {
+      return {
+        success: true,
+        data: validCodes[code.toUpperCase()],
+      };
+    }
+
+    return {
+      success: false,
+      message: "Neispravni kod za popust",
+    };
+  },
+
   // Search suggestions
   getSearchSuggestions: async (term) => {
     return await api.get(

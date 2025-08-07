@@ -4,11 +4,14 @@ import Button from "../../components/common/Button";
 import InputField from "../../components/common/InputField";
 import Modal from "../../components/common/Modal";
 import LoadingSpinner from "../../components/common/LoadingSpinner";
+import TicketPurchase from "../../components/tickets/TicketPurchase";
 import { useCart } from "../../context/CartContext";
+import { useAuth } from "../../context/AuthContext";
 import "./CartPage.css";
 
 const CartPage = () => {
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   const {
     cartItems,
     removeFromCart,
@@ -16,12 +19,24 @@ const CartPage = () => {
     clearCart,
     getTotalPrice,
     getTotalItems,
+    isProcessing,
+    setIsProcessing,
   } = useCart();
 
-  // State za checkout process
-  const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [showClearModal, setShowClearModal] = useState(false);
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+  const [error, setError] = useState("");
+
+  // Redirect to login if not authenticated
+  if (!isAuthenticated()) {
+    return (
+      <div style={{ textAlign: "center", padding: "2rem" }}>
+        <h2>Prijavite se</h2>
+        <p>Morate biti prijavljeni da biste pristupili korpi.</p>
+        <Button onClick={() => navigate("/login")}>Prijavite se</Button>
+      </div>
+    );
+  }
 
   const formatPrice = (price) => {
     return new Intl.NumberFormat("sr-RS").format(price);
@@ -33,6 +48,14 @@ const CartPage = () => {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
+    });
+  };
+
+  const formatTime = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleTimeString("sr-RS", {
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
@@ -48,24 +71,24 @@ const CartPage = () => {
     setShowClearModal(false);
   };
 
-  const handleCheckout = async () => {
-    setIsCheckingOut(true);
-
-    // Simuliramo checkout process
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      setShowCheckoutModal(true);
-      clearCart();
-    } catch (error) {
-      alert("Greška pri obradi narudžbine. Pokušajte ponovo.");
-    } finally {
-      setIsCheckingOut(false);
-    }
+  const handleCheckout = () => {
+    if (cartItems.length === 0) return;
+    setShowCheckoutModal(true);
   };
 
-  const handleCheckoutSuccess = () => {
+  const handlePurchaseComplete = (purchaseResults) => {
+    clearCart();
     setShowCheckoutModal(false);
-    navigate("/");
+
+    // Navigate to tickets page or show success
+    setTimeout(() => {
+      navigate("/profile/tickets");
+    }, 2000);
+  };
+
+  const handlePurchaseError = (errorMessage) => {
+    setError(errorMessage);
+    setIsProcessing(false);
   };
 
   if (cartItems.length === 0) {
@@ -74,9 +97,9 @@ const CartPage = () => {
         <div className="empty-cart">
           <div className="empty-cart-icon">🛒</div>
           <h2>Vaša korpa je prazna</h2>
-          <p>Izgleda da niste dodali nijednu kartu u korpu.</p>
+          <p>Niste dodali nijednu kartu u korpu.</p>
           <Button onClick={() => navigate("/events")} size="large">
-            🎫 Pogledaj događaje
+            Pogledaj događaje
           </Button>
         </div>
       </div>
@@ -86,7 +109,7 @@ const CartPage = () => {
   return (
     <div className="cart-page">
       <div className="cart-header">
-        <h1>🛒 Vaša korpa</h1>
+        <h1>Vaša korpa</h1>
         <div className="cart-summary">
           <span className="total-items">{getTotalItems()} stavki</span>
           <span className="total-price">
@@ -94,6 +117,29 @@ const CartPage = () => {
           </span>
         </div>
       </div>
+
+      {error && (
+        <div
+          style={{
+            color: "red",
+            marginBottom: "1rem",
+            padding: "1rem",
+            backgroundColor: "#fee",
+            border: "1px solid #fcc",
+            borderRadius: "4px",
+          }}
+        >
+          {error}
+          <Button
+            variant="outline"
+            size="small"
+            onClick={() => setError("")}
+            style={{ marginLeft: "1rem" }}
+          >
+            Zatvori
+          </Button>
+        </div>
+      )}
 
       <div className="cart-content">
         <div className="cart-items">
@@ -105,7 +151,7 @@ const CartPage = () => {
               onClick={() => setShowClearModal(true)}
               className="clear-cart-btn"
             >
-              🗑️ Očisti korpu
+              Očisti korpu
             </Button>
           </div>
 
@@ -113,17 +159,22 @@ const CartPage = () => {
             {cartItems.map((item) => (
               <div key={item.id} className="cart-item">
                 <div className="item-image">
-                  <img src={item.image} alt={item.title} />
+                  <img
+                    src={
+                      item.image ||
+                      `https://picsum.photos/100/80?random=${item.event_id}`
+                    }
+                    alt={item.title}
+                  />
                 </div>
 
                 <div className="item-details">
                   <h3 className="item-title">{item.title}</h3>
-
                   <div className="item-info">
                     <div className="info-row">
                       <span className="icon">📅</span>
                       <span>
-                        {formatDate(item.date)} u {item.time}
+                        {formatDate(item.date)} u {formatTime(item.date)}
                       </span>
                     </div>
                     <div className="info-row">
@@ -131,12 +182,12 @@ const CartPage = () => {
                       <span>{item.location}</span>
                     </div>
                   </div>
+                </div>
 
-                  <div className="item-price">
-                    <span className="single-price">
-                      {formatPrice(item.price)} RSD po karti
-                    </span>
-                  </div>
+                <div className="item-price">
+                  <span className="single-price">
+                    {formatPrice(item.price)} RSD po karti
+                  </span>
                 </div>
 
                 <div className="item-controls">
@@ -165,7 +216,7 @@ const CartPage = () => {
                     onClick={() => removeFromCart(item.id)}
                     className="remove-btn"
                   >
-                    🗑️ Ukloni
+                    Ukloni
                   </Button>
                 </div>
               </div>
@@ -175,52 +226,48 @@ const CartPage = () => {
 
         <div className="cart-sidebar">
           <div className="order-summary">
-            <h3>📋 Pregled narudžbine</h3>
-
+            <h3>Pregled narudžbine</h3>
             <div className="summary-row">
-              <span>Ukupno stavki:</span>
+              <span>Stavki:</span>
               <span>{getTotalItems()}</span>
             </div>
-
             <div className="summary-row">
-              <span>Ukupno karte:</span>
+              <span>Karte:</span>
               <span>{getTotalItems()}</span>
             </div>
-
             <div className="summary-row total">
               <strong>
-                <span>Ukupno za plaćanje:</span>
+                <span>Za plaćanje:</span>
                 <span>{formatPrice(getTotalPrice())} RSD</span>
               </strong>
             </div>
+          </div>
 
-            <div className="checkout-actions">
-              <Button
-                size="large"
-                onClick={handleCheckout}
-                disabled={isCheckingOut}
-                loading={isCheckingOut}
-                className="checkout-btn"
-              >
-                {isCheckingOut ? "Obrađuje se..." : "💳 Završi kupovinu"}
-              </Button>
+          <div className="checkout-actions">
+            <Button
+              size="large"
+              onClick={handleCheckout}
+              disabled={isProcessing || cartItems.length === 0}
+              className="checkout-btn"
+            >
+              {isProcessing ? "Obrađuje se..." : "Završi kupovinu"}
+            </Button>
 
-              <Button
-                variant="outline"
-                onClick={() => navigate("/events")}
-                className="continue-shopping-btn"
-              >
-                ← Nastavi kupovinu
-              </Button>
-            </div>
+            <Button
+              variant="outline"
+              onClick={() => navigate("/events")}
+              className="continue-shopping-btn"
+            >
+              ← Nastavi kupovinu
+            </Button>
           </div>
 
           <div className="help-section">
-            <h4>💡 Potrebna vam je pomoć?</h4>
+            <h4>Potrebna vam je pomoć?</h4>
             <p>Kontaktirajte naš tim za podršku:</p>
             <ul>
               <li>📞 +381 11 123 4567</li>
-              <li>📧 podrska@ticketmaster.rs</li>
+              <li>✉️ podrska@ticketmaster.rs</li>
             </ul>
           </div>
         </div>
@@ -230,11 +277,11 @@ const CartPage = () => {
       <Modal
         isOpen={showClearModal}
         onClose={() => setShowClearModal(false)}
-        title="🗑️ Očisti korpu"
+        title="Očisti korpu"
         size="small"
       >
         <div className="clear-modal">
-          <p>Da li ste sigurni da želite da očistite korpu?</p>
+          <p>Da li želite da očistite korpu?</p>
           <p>
             <strong>Sve stavke će biti uklonjene.</strong>
           </p>
@@ -249,32 +296,22 @@ const CartPage = () => {
         </div>
       </Modal>
 
-      {/* Checkout Success Modal */}
+      {/* Checkout Modal */}
       <Modal
         isOpen={showCheckoutModal}
-        onClose={handleCheckoutSuccess}
-        title="✅ Uspešna kupovina!"
-        size="medium"
-        closeOnOverlayClick={false}
-        closeOnEscape={false}
+        onClose={() => setShowCheckoutModal(false)}
+        title="Kupovina karata"
+        size="large"
       >
-        <div className="success-modal">
-          <div className="success-icon">🎉</div>
-          <h3>Vaša narudžbina je uspešno obrađena!</h3>
-          <p>Karte će vam biti poslate na email adresu u najkraćem roku.</p>
-          <p>
-            <strong>Broj narudžbine:</strong> #TM{Date.now()}
-          </p>
-          <div className="modal-actions">
-            <Button onClick={handleCheckoutSuccess} size="large">
-              🏠 Vrati se na početnu
-            </Button>
-          </div>
-        </div>
+        <TicketPurchase
+          cartItems={cartItems}
+          onPurchaseComplete={handlePurchaseComplete}
+          onError={handlePurchaseError}
+        />
       </Modal>
 
       {/* Loading Overlay */}
-      {isCheckingOut && (
+      {isProcessing && (
         <div className="checkout-loading">
           <LoadingSpinner
             size="large"

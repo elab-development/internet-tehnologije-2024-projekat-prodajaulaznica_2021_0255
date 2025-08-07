@@ -237,6 +237,15 @@ export const apiService = {
       `/events/search/suggestions?term=${encodeURIComponent(term)}`
     );
   },
+
+  // Categories
+  getCategoryEvents: async (categoryId, page = 1) => {
+    return await api.get(`/categories/${categoryId}/events?page=${page}`);
+  },
+
+  getCategoryStatistics: async (categoryId) => {
+    return await api.get(`/categories/${categoryId}/statistics`);
+  },
 };
 
 export default apiService;

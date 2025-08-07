@@ -12,6 +12,8 @@ import { AuthProvider } from "./context/AuthContext";
 import RegisterPage from "./pages/RegisterPage/RegistrerPage";
 import ProtectedRoute from "./components/common/ProtectedRoute/ProtectedRoute";
 import GuestRoute from "./components/common/GuestRoute/GuestRoute";
+import CategoriesPage from "./pages/CategoriesPage/CategoriesPage";
+import CategoryDetailsPage from "./pages/CategoryDetailsPage/CategoryDetailsPage";
 import "./App.css";
 
 function App() {
@@ -78,6 +80,12 @@ function App() {
                       <a href="/">Vrati se na početnu</a>
                     </div>
                   }
+                />
+
+                <Route path="/categories" element={<CategoriesPage />} />
+                <Route
+                  path="/categories/:id"
+                  element={<CategoryDetailsPage />}
                 />
               </Routes>
             </Layout>

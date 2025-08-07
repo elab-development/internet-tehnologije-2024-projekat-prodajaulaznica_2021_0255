@@ -30,6 +30,7 @@ Route::get('events/search/suggestions', [EventController::class, 'searchSuggesti
 Route::get('categories', [CategoryController::class, 'index']);
 Route::get('categories/{id}', [CategoryController::class, 'show']);
 Route::get('categories/{id}/events', [CategoryController::class, 'getEvents']);
+Route::get('categories/{id}/statistics', [CategoryController::class, 'getStatistics']);
 
 // Public ticket validation
 Route::get('tickets/validate/{ticketNumber}', [TicketController::class, 'validateTicket']);

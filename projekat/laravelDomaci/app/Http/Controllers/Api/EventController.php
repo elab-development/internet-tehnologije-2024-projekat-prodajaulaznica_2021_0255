@@ -572,39 +572,126 @@ class EventController extends Controller
     }
 
 
-/**
-     * @OA\Delete(
-     *     path="/api/events/{id}",
-     *     summary="Delete an event",
-     *     tags={"Events"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(
-     *         name="id",
-     *         in="path",
-     *         required=true,
-     *         @OA\Schema(type="integer")
-     *     ),
-     *     @OA\Response(response=200, description="Event deleted successfully"),
-     *     @OA\Response(response=422, description="Cannot delete event with sold tickets")
-     * )
-     */
+    /**
+ * @OA\Delete(
+ *     path="/api/events/{id}",
+ *     summary="Delete an event",
+ *     description="Deletes an event by ID. If the event has sold tickets (active or used), deletion will fail with a 422 response. If the event is currently active, a warning will be logged.",
+ *     operationId="deleteEvent",
+ *     tags={"Events"},
+ *     security={{"sanctum":{}}},
+ *     
+ *     @OA\Parameter(
+ *         name="id",
+ *         in="path",
+ *         description="ID of the event to delete",
+ *         required=true,
+ *         @OA\Schema(type="string")
+ *     ),
+ *     
+ *     @OA\Response(
+ *         response=200,
+ *         description="Event deleted successfully",
+ *         @OA\JsonContent(
+ *             @OA\Property(property="success", type="boolean", example=true),
+ *             @OA\Property(property="message", type="string", example="Event deleted successfully")
+ *         )
+ *     ),
+ *     
+ *     @OA\Response(
+ *         response=404,
+ *         description="Event not found",
+ *         @OA\JsonContent(
+ *             @OA\Property(property="success", type="boolean", example=false),
+ *             @OA\Property(property="message", type="string", example="Event not found"),
+ *             @OA\Property(property="data", type="string", nullable=true, example=null)
+ *         )
+ *     ),
+ *     
+ *     @OA\Response(
+ *         response=422,
+ *         description="Cannot delete event with sold tickets",
+ *         @OA\JsonContent(
+ *             @OA\Property(property="success", type="boolean", example=false),
+ *             @OA\Property(property="message", type="string", example="Cannot delete event with sold tickets (5 tickets sold)"),
+ *             @OA\Property(property="data", type="object",
+ *                 @OA\Property(property="sold_tickets_count", type="integer", example=5),
+ *                 @OA\Property(property="can_force_delete", type="boolean", example=false)
+ *             )
+ *         )
+ *     ),
+ *     
+ *     @OA\Response(
+ *         response=500,
+ *         description="Error deleting event",
+ *         @OA\JsonContent(
+ *             @OA\Property(property="success", type="boolean", example=false),
+ *             @OA\Property(property="message", type="string", example="Error deleting event"),
+ *             @OA\Property(property="data", type="string", nullable=true, example=null)
+ *         )
+ *     )
+ * )
+ */
     public function destroy(string $id): JsonResponse
     {
-        $event = Event::findOrFail($id);
-        
-        // Proveriti da li postoje prodane ulaznice
-        if ($event->tickets()->count() > 0) {
+        try {
+            $event = Event::with('tickets')->findOrFail($id);
+            
+            // Check if event has sold tickets
+            $soldTicketsCount = $event->tickets()->whereIn('status', ['active', 'used'])->count();
+            
+            if ($soldTicketsCount > 0) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Cannot delete event with sold tickets ({$soldTicketsCount} tickets sold)",
+                    'data' => [
+                        'sold_tickets_count' => $soldTicketsCount,
+                        'can_force_delete' => false // Could be used for admin override
+                    ]
+                ], 422);
+            }
+            
+            // Check if event is currently active
+            $isActive = $event->start_date <= now() && $event->end_date > now();
+            
+            if ($isActive) {
+                // Log the deletion of an active event
+                \Log::warning('Active event deleted', [
+                    'event_id' => $event->id,
+                    'event_name' => $event->name,
+                    'deleted_by' => auth()->id()
+                ]);
+            }
+            
+            // Delete the event (this will cascade delete tickets due to foreign key constraint)
+            $event->delete();
+            
             return response()->json([
-                'message' => 'Cannot delete event with sold tickets'
-            ], 422);
+                'success' => true,
+                'message' => 'Event deleted successfully'
+            ]);
+            
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Event not found',
+                'data' => null
+            ], 404);
+        } catch (\Exception $e) {
+            \Log::error('Error deleting event', [
+                'event_id' => $id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Error deleting event',
+                'data' => null
+            ], 500);
         }
-        
-        $event->delete();
-
-        return response()->json([
-            'message' => 'Event deleted successfully'
-        ]);
     }
+
 
     /**
      * @OA\Get(

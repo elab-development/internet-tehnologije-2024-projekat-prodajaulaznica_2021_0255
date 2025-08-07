@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
 import EventForm from "../../components/admin/EventForm";
-import EventStatusManager from "../../components/admin/EventStatusManager";
 import Button from "../../components/common/Button";
 import Modal from "../../components/common/Modal";
+import DeleteConfirmationModal from "../../components/common/DeleteConfirmationModal";
 import Pagination from "../../components/common/Pagination";
 import apiService from "../../services/api";
 
@@ -17,6 +17,7 @@ const AdminEventsPage = () => {
   const [deletingEvent, setDeletingEvent] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   useEffect(() => {
     if (isAdmin()) {
@@ -57,6 +58,7 @@ const AdminEventsPage = () => {
   const handleDeleteEvent = async () => {
     if (!deletingEvent) return;
 
+    setDeleteLoading(true);
     try {
       const response = await apiService.deleteEvent(deletingEvent.id);
 
@@ -65,10 +67,43 @@ const AdminEventsPage = () => {
           prev.filter((event) => event.id !== deletingEvent.id)
         );
         setDeletingEvent(null);
+
+        // Show success message
+        setTimeout(() => {
+          alert("Događaj je uspešno obrisan.");
+        }, 100);
       }
     } catch (error) {
       alert("Greška pri brisanju događaja: " + error.message);
+    } finally {
+      setDeleteLoading(false);
     }
+  };
+
+  const getEventDeletionInfo = (event) => {
+    const soldTickets = event.total_tickets - event.available_tickets;
+    const isEventActive = new Date(event.end_date) > new Date();
+
+    let warnings = [];
+
+    if (soldTickets > 0) {
+      warnings.push(`Ovaj događaj ima ${soldTickets} prodanih karata.`);
+    }
+
+    if (isEventActive) {
+      warnings.push("Događaj je još uvek aktivan.");
+    }
+
+    if (event.featured) {
+      warnings.push("Događaj je označen kao popularan.");
+    }
+
+    return {
+      hasSoldTickets: soldTickets > 0,
+      isActive: isEventActive,
+      warnings: warnings,
+      soldTickets: soldTickets,
+    };
   };
 
   const formatDate = (dateString) => {
@@ -104,7 +139,12 @@ const AdminEventsPage = () => {
           marginBottom: "2rem",
         }}
       >
-        <h1>Upravljanje događajima</h1>
+        <div>
+          <h1>Upravljanje događajima</h1>
+          <p style={{ color: "#666", margin: "0.5rem 0 0 0" }}>
+            Ukupno događaja: {events.length}
+          </p>
+        </div>
         <Button onClick={() => setShowCreateForm(true)}>
           + Kreiraj novi događaj
         </Button>
@@ -122,6 +162,14 @@ const AdminEventsPage = () => {
           }}
         >
           {error}
+          <Button
+            variant="outline"
+            size="small"
+            onClick={loadEvents}
+            style={{ marginLeft: "1rem" }}
+          >
+            Pokušaj ponovo
+          </Button>
         </div>
       )}
 
@@ -199,15 +247,6 @@ const AdminEventsPage = () => {
                   <th
                     style={{
                       padding: "1rem",
-                      textAlign: "left",
-                      borderBottom: "1px solid #dee2e6",
-                    }}
-                  >
-                    Upravljanje
-                  </th>
-                  <th
-                    style={{
-                      padding: "1rem",
                       textAlign: "center",
                       borderBottom: "1px solid #dee2e6",
                     }}
@@ -217,115 +256,117 @@ const AdminEventsPage = () => {
                 </tr>
               </thead>
               <tbody>
-                {events.map((event) => (
-                  <tr
-                    key={event.id}
-                    style={{ borderBottom: "1px solid #dee2e6" }}
-                  >
-                    <td style={{ padding: "1rem" }}>
-                      <div>
-                        <strong>{event.name}</strong>
-                        {event.featured && (
-                          <span
-                            style={{
-                              marginLeft: "0.5rem",
-                              padding: "0.25rem 0.5rem",
-                              backgroundColor: "#ff6b6b",
-                              color: "white",
-                              borderRadius: "4px",
-                              fontSize: "0.75rem",
-                            }}
+                {events.map((event) => {
+                  const deletionInfo = getEventDeletionInfo(event);
+
+                  return (
+                    <tr
+                      key={event.id}
+                      style={{ borderBottom: "1px solid #dee2e6" }}
+                    >
+                      <td style={{ padding: "1rem" }}>
+                        <div>
+                          <strong>{event.name}</strong>
+                          {event.featured && (
+                            <span
+                              style={{
+                                marginLeft: "0.5rem",
+                                padding: "0.25rem 0.5rem",
+                                backgroundColor: "#ff6b6b",
+                                color: "white",
+                                borderRadius: "4px",
+                                fontSize: "0.75rem",
+                              }}
+                            >
+                              Popularno
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: "0.875rem", color: "#666" }}>
+                          📍 {event.location}
+                        </div>
+                      </td>
+                      <td style={{ padding: "1rem" }}>
+                        <span
+                          style={{
+                            padding: "0.25rem 0.5rem",
+                            backgroundColor: event.category?.color || "#3498db",
+                            color: "white",
+                            borderRadius: "4px",
+                            fontSize: "0.875rem",
+                          }}
+                        >
+                          {event.category?.name || "N/A"}
+                        </span>
+                      </td>
+                      <td style={{ padding: "1rem" }}>
+                        {formatDate(event.start_date)}
+                      </td>
+                      <td style={{ padding: "1rem" }}>
+                        {formatPrice(event.price)} RSD
+                      </td>
+                      <td style={{ padding: "1rem" }}>
+                        <div>
+                          {event.available_tickets} / {event.total_tickets}
+                        </div>
+                        <div style={{ fontSize: "0.875rem", color: "#666" }}>
+                          {event.sold_tickets} prodano
+                        </div>
+                      </td>
+                      <td style={{ padding: "1rem" }}>
+                        <span
+                          style={{
+                            padding: "0.25rem 0.5rem",
+                            backgroundColor: event.is_active
+                              ? "#28a745"
+                              : "#6c757d",
+                            color: "white",
+                            borderRadius: "4px",
+                            fontSize: "0.875rem",
+                          }}
+                        >
+                          {event.is_active ? "Aktivan" : "Završen"}
+                        </span>
+                      </td>
+                      <td style={{ padding: "1rem", textAlign: "center" }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: "0.5rem",
+                            justifyContent: "center",
+                          }}
+                        >
+                          <Button
+                            size="small"
+                            variant="outline"
+                            onClick={() => setEditingEvent(event)}
                           >
-                            Popularno
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ fontSize: "0.875rem", color: "#666" }}>
-                        📍 {event.location}
-                      </div>
-                    </td>
-                    <td style={{ padding: "1rem" }}>
-                      <span
-                        style={{
-                          padding: "0.25rem 0.5rem",
-                          backgroundColor: event.category?.color || "#3498db",
-                          color: "white",
-                          borderRadius: "4px",
-                          fontSize: "0.875rem",
-                        }}
-                      >
-                        {event.category?.name || "N/A"}
-                      </span>
-                    </td>
-                    <td style={{ padding: "1rem" }}>
-                      {formatDate(event.start_date)}
-                    </td>
-                    <td style={{ padding: "1rem" }}>
-                      {formatPrice(event.price)} RSD
-                    </td>
-                    <td style={{ padding: "1rem" }}>
-                      <div>
-                        {event.available_tickets} / {event.total_tickets}
-                      </div>
-                      <div style={{ fontSize: "0.875rem", color: "#666" }}>
-                        {event.sold_tickets} prodano
-                      </div>
-                    </td>
-                    <td style={{ padding: "1rem" }}>
-                      <span
-                        style={{
-                          padding: "0.25rem 0.5rem",
-                          backgroundColor: event.is_active
-                            ? "#28a745"
-                            : "#6c757d",
-                          color: "white",
-                          borderRadius: "4px",
-                          fontSize: "0.875rem",
-                        }}
-                      >
-                        {event.is_active ? "Aktivan" : "Završen"}
-                      </span>
-                    </td>
-                    <td style={{ padding: "1rem" }}>
-                      <EventStatusManager
-                        event={event}
-                        onUpdate={(updatedEvent) => {
-                          setEvents((prev) =>
-                            prev.map((e) =>
-                              e.id === updatedEvent.id ? updatedEvent : e
-                            )
-                          );
-                        }}
-                      />
-                    </td>
-                    <td style={{ padding: "1rem", textAlign: "center" }}>
-                      <div
-                        style={{
-                          display: "flex",
-                          gap: "0.5rem",
-                          justifyContent: "center",
-                        }}
-                      >
-                        <Button
-                          size="small"
-                          variant="outline"
-                          onClick={() => setEditingEvent(event)}
-                        >
-                          Uredi
-                        </Button>
-                        <Button
-                          size="small"
-                          variant="danger"
-                          onClick={() => setDeletingEvent(event)}
-                        >
-                          Obriši
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                            Uredi
+                          </Button>
+                          <Button
+                            size="small"
+                            variant="danger"
+                            onClick={() => setDeletingEvent(event)}
+                            disabled={deleteLoading}
+                          >
+                            Obriši
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
+
+            {events.length === 0 && (
+              <div style={{ textAlign: "center", padding: "3rem" }}>
+                <h3>Nema događaja</h3>
+                <p style={{ color: "#666" }}>
+                  Kreirajte prvi događaj klikom na dugme iznad.
+                </p>
+              </div>
+            )}
           </div>
 
           {totalPages > 1 && (
@@ -368,32 +409,34 @@ const AdminEventsPage = () => {
       </Modal>
 
       {/* Delete Confirmation Modal */}
-      <Modal
-        isOpen={!!deletingEvent}
-        onClose={() => setDeletingEvent(null)}
-        title="Potvrdi brisanje"
-        size="small"
-      >
-        {deletingEvent && (
-          <div>
-            <p>Da li ste sigurni da želite da obrišete događaj:</p>
-            <p>
-              <strong>{deletingEvent.name}</strong>
-            </p>
-            <p style={{ color: "red", fontSize: "0.875rem" }}>
-              Ova akcija se ne može poništiti.
-            </p>
-            <div style={{ display: "flex", gap: "1rem", marginTop: "1.5rem" }}>
-              <Button variant="danger" onClick={handleDeleteEvent}>
-                Da, obriši
-              </Button>
-              <Button variant="outline" onClick={() => setDeletingEvent(null)}>
-                Otkaži
-              </Button>
-            </div>
-          </div>
-        )}
-      </Modal>
+      {deletingEvent && (
+        <DeleteConfirmationModal
+          isOpen={!!deletingEvent}
+          onClose={() => setDeletingEvent(null)}
+          onConfirm={handleDeleteEvent}
+          title="Obriši događaj"
+          message="Da li ste sigurni da želite da obrišete ovaj događaj?"
+          itemName={deletingEvent.name}
+          requireConfirmation={
+            getEventDeletionInfo(deletingEvent).hasSoldTickets
+          }
+          confirmationText="OBRIŠI"
+          additionalInfo={
+            getEventDeletionInfo(deletingEvent).warnings.length > 0 && (
+              <div>
+                <strong>Napomene:</strong>
+                <ul style={{ margin: "0.5rem 0 0 0", paddingLeft: "1.5rem" }}>
+                  {getEventDeletionInfo(deletingEvent).warnings.map(
+                    (warning, index) => (
+                      <li key={index}>{warning}</li>
+                    )
+                  )}
+                </ul>
+              </div>
+            )
+          }
+        />
+      )}
     </div>
   );
 };

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { useAuth } from "../../context/AuthContext";
-import Button from "./Button";
-import InputField from "./InputField";
+import { useAuth } from "../../../context/AuthContext";
+import Button from "../Button";
+import InputField from "../InputField";
 
 const UserProfile = () => {
   const { user, updateUser } = useAuth();

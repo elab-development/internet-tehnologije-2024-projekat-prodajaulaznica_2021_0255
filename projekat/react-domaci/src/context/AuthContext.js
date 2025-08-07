@@ -160,6 +160,10 @@ export const AuthProvider = ({ children }) => {
     return false;
   };
 
+  const isAuthenticated = () => {
+    return !!(user && token);
+  };
+
   // Periodic auth check
   useEffect(() => {
     if (isAuthenticated()) {
@@ -176,10 +180,6 @@ export const AuthProvider = ({ children }) => {
     const updatedUser = { ...user, ...userData };
     setUser(updatedUser);
     localStorage.setItem("user", JSON.stringify(updatedUser));
-  };
-
-  const isAuthenticated = () => {
-    return !!(user && token);
   };
 
   const hasRole = (role) => {

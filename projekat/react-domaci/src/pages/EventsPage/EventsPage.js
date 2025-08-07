@@ -3,122 +3,131 @@ import EventCard from "../../components/common/EventCard";
 import InputField from "../../components/common/InputField";
 import Pagination from "../../components/common/Pagination";
 import Button from "../../components/common/Button";
-import { apiService } from "../../services/api";
+import apiService from "../../services/api";
 import useDebounce from "../../hooks/useDebounce";
 import "./EventsPage.css";
 
 const EventsPage = () => {
-  // State za događaje i loading
+  // State for events and loading
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // State za paginaciju
+  // State for pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalEvents, setTotalEvents] = useState(0);
-  const eventsPerPage = 4;
+  const eventsPerPage = 6;
 
-  // State za pretraživanje i filtriranje
+  // State for search and filtering
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [categories, setCategories] = useState([]);
 
-  // State za sortiranje
-  const [sortBy, setSortBy] = useState("date");
+  // State for sorting
+  const [sortBy, setSortBy] = useState("start_date");
   const [sortOrder, setSortOrder] = useState("asc");
 
-  // Debounced search term za optimizaciju
+  // Debounced search term for optimization
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
 
-  // Učitavanje kategorija pri inicijalnom render-u
+  // Load categories from Laravel API
   useEffect(() => {
     const loadCategories = async () => {
       try {
         const response = await apiService.getCategories();
-        setCategories(response.data);
-      } catch (err) {
-        console.error("Greška pri učitavanju kategorija:", err);
+        if (response.success) {
+          setCategories(response.data || []);
+        }
+      } catch (error) {
+        console.error("Error loading categories:", error);
       }
     };
 
     loadCategories();
   }, []);
 
-  // Glavna funkcija za učitavanje događaja
+  // Main function for loading events from Laravel API
   const loadEvents = async (page = 1, search = "", category = "all") => {
-    try {
-      setLoading(true);
-      setError(null);
+    setLoading(true);
+    setError(null);
 
+    try {
       let response;
 
-      if (search || category !== "all") {
-        // Ako ima pretraživanja ili filtera, koristimo search funkciju
+      if (search.trim() || category !== "all") {
+        // Use search API
         response = await apiService.searchEvents(search, category);
 
-        // Manuelna paginacija za search rezultate
-        const startIndex = (page - 1) * eventsPerPage;
-        const endIndex = startIndex + eventsPerPage;
-        const paginatedResults = response.data.slice(startIndex, endIndex);
+        if (response.success) {
+          const allResults = response.data || [];
 
-        setEvents(paginatedResults);
-        setTotalEvents(response.data.length);
-        setTotalPages(Math.ceil(response.data.length / eventsPerPage));
+          // Manual pagination for search results
+          const startIndex = (page - 1) * eventsPerPage;
+          const endIndex = startIndex + eventsPerPage;
+          const paginatedResults = allResults.slice(startIndex, endIndex);
+
+          setEvents(paginatedResults);
+          setTotalEvents(allResults.length);
+          setTotalPages(Math.ceil(allResults.length / eventsPerPage));
+        }
       } else {
-        // Inače koristimo regularno učitavanje sa paginacijom
+        // Use regular pagination API
         response = await apiService.getEvents(page, eventsPerPage);
-        setEvents(response.data);
-        setTotalEvents(response.totalEvents);
-        setTotalPages(response.totalPages);
+
+        if (response.success) {
+          setEvents(response.data || []);
+          setTotalEvents(response.totalEvents || 0);
+          setTotalPages(response.totalPages || 1);
+        }
       }
 
       setCurrentPage(page);
     } catch (err) {
-      setError(err.message);
+      setError(err.message || "Greška pri učitavanju događaja");
       setEvents([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // Effect za učitavanje događaja kada se promene filteri
+  // Effect for loading events when filters change
   useEffect(() => {
     loadEvents(1, debouncedSearchTerm, selectedCategory);
   }, [debouncedSearchTerm, selectedCategory]);
 
-  // Handler za promenu stranice
+  // Handle page change
   const handlePageChange = (page) => {
     loadEvents(page, debouncedSearchTerm, selectedCategory);
-    // Scroll na vrh stranice
+    // Scroll to top of page
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // Handler za reset filtera
+  // Handle reset filters
   const handleResetFilters = () => {
     setSearchTerm("");
     setSelectedCategory("all");
-    setSortBy("date");
+    setSortBy("start_date");
     setSortOrder("asc");
     setCurrentPage(1);
   };
 
-  // Sortiranje događaja
+  // Sort events (client-side for now)
   const sortedEvents = [...events].sort((a, b) => {
     let aValue, bValue;
 
     switch (sortBy) {
       case "price":
-        aValue = a.price;
-        bValue = b.price;
+        aValue = parseFloat(a.price) || 0;
+        bValue = parseFloat(b.price) || 0;
         break;
-      case "date":
-        aValue = new Date(a.date);
-        bValue = new Date(b.date);
+      case "start_date":
+        aValue = new Date(a.start_date);
+        bValue = new Date(b.start_date);
         break;
-      case "title":
-        aValue = a.title.toLowerCase();
-        bValue = b.title.toLowerCase();
+      case "name":
+        aValue = a.name?.toLowerCase() || "";
+        bValue = b.name?.toLowerCase() || "";
         break;
       default:
         return 0;
@@ -133,16 +142,17 @@ const EventsPage = () => {
 
   return (
     <div className="events-page">
+      {/* Events header */}
       <div className="events-header">
-        <h1>🎫 Svi događaji</h1>
+        <h1>Događaji</h1>
         <p>Pronađite savršen događaj za vas</p>
       </div>
 
-      {/* Filteri i pretraživanje */}
+      {/* Filters and search */}
       <div className="events-filters">
-        <div className="filters-row">
+        <div className="filter-row">
           <InputField
-            placeholder=" Pretražite događaje..."
+            placeholder="Pretražite događaje..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="search-input"
@@ -158,8 +168,8 @@ const EventsPage = () => {
             >
               <option value="all">Sve kategorije</option>
               {categories.map((category) => (
-                <option key={category} value={category}>
-                  {category}
+                <option key={category.id} value={category.id}>
+                  {category.name}
                 </option>
               ))}
             </select>
@@ -172,9 +182,9 @@ const EventsPage = () => {
               onChange={(e) => setSortBy(e.target.value)}
               className="sort-select"
             >
-              <option value="date">Datum</option>
+              <option value="start_date">Datum</option>
               <option value="price">Cena</option>
-              <option value="title">Naziv</option>
+              <option value="name">Naziv</option>
             </select>
           </div>
 
@@ -195,12 +205,12 @@ const EventsPage = () => {
             onClick={handleResetFilters}
             className="reset-btn"
           >
-            🔄 Reset
+            Resetuj filtere
           </Button>
         </div>
       </div>
 
-      {/* Rezultati */}
+      {/* Results */}
       <div className="events-results">
         <div className="results-info">
           {loading ? (
@@ -212,7 +222,9 @@ const EventsPage = () => {
                 <span className="filter-info">
                   {searchTerm && ` za "${searchTerm}"`}
                   {selectedCategory !== "all" &&
-                    ` u kategoriji "${selectedCategory}"`}
+                    ` u kategoriji "${
+                      categories.find((c) => c.id == selectedCategory)?.name
+                    }"`}
                 </span>
               )}
             </span>
@@ -223,14 +235,14 @@ const EventsPage = () => {
         {loading && (
           <div className="loading">
             <div className="loading-spinner"></div>
-            Učitavanje događaja...
+            <p>Učitavanje događaja...</p>
           </div>
         )}
 
         {/* Error state */}
         {error && (
           <div className="error">
-            <span>⚠️ {error}</span>
+            <span>{error}</span>
             <Button
               onClick={() =>
                 loadEvents(1, debouncedSearchTerm, selectedCategory)
@@ -252,23 +264,23 @@ const EventsPage = () => {
               </div>
             ) : (
               <div className="no-events">
-                <h3>😕 Nema događaja</h3>
+                <h3>Nema događaja</h3>
                 <p>Nema događaja koji odgovaraju vašim kriterijumima.</p>
                 <Button onClick={handleResetFilters}>
                   Prikaži sve događaje
                 </Button>
               </div>
             )}
-
-            {/* Pagination */}
-            {sortedEvents.length > 0 && totalPages > 1 && (
-              <Pagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPageChange={handlePageChange}
-              />
-            )}
           </>
+        )}
+
+        {/* Pagination */}
+        {sortedEvents.length > 0 && totalPages > 1 && (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={handlePageChange}
+          />
         )}
       </div>
     </div>

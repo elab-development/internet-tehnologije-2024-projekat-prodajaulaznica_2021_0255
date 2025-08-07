@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import Button from "./Button";
-import InputField from "./InputField";
+import Button from "../Button";
+import InputField from "../InputField";
 
 const PasswordChange = () => {
   const [isChanging, setIsChanging] = useState(false);

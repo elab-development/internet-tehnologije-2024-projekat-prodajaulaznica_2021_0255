@@ -7,54 +7,161 @@ use Illuminate\Http\Request;
 use App\Models\Event;
 use App\Models\Category;
 use Illuminate\Http\JsonResponse;
+use App\Http\Resources\EventResource;
 
 class EventController extends Controller
 {
-    /**
-     * @OA\Tag(
-     *     name="Events",
-     *     description="Operations related to event management"
-     * )
-     */
-    /**
+/**
      * @OA\Get(
-     *     path="/api/events",
-     *     summary="Get all events with optional filters",
-     *     tags={"Events"},
-     *     @OA\Parameter(
-     *         name="category_id",
-     *         in="query",
-     *         description="Filter by category ID",
-     *         @OA\Schema(type="integer")
-     *     ),
-     *     @OA\Parameter(
-     *         name="available_only",
-     *         in="query",
-     *         description="Filter to only events with available tickets",
-     *         @OA\Schema(type="boolean")
-     *     ),
-     *     @OA\Response(response=200, description="List of events")
+     * path="/api/events",
+     * summary="Get a list of events with filtering, sorting, and pagination",
+     * tags={"Events"},
+     * @OA\Parameter(
+     * name="search_term",
+     * in="query",
+     * description="Search term for event name, location, and description",
+     * required=false,
+     * @OA\Schema(type="string")
+     * ),
+     * @OA\Parameter(
+     * name="category_id",
+     * in="query",
+     * description="Filter events by category ID",
+     * required=false,
+     * @OA\Schema(type="integer")
+     * ),
+     * @OA\Parameter(
+     * name="available_only",
+     * in="query",
+     * description="Filter to show only events with available tickets",
+     * required=false,
+     * @OA\Schema(type="string", enum={"true"})
+     * ),
+     * @OA\Parameter(
+     * name="featured",
+     * in="query",
+     * description="Filter to show only featured events",
+     * required=false,
+     * @OA\Schema(type="string", enum={"true"})
+     * ),
+     * @OA\Parameter(
+     * name="sort_by",
+     * in="query",
+     * description="Field to sort by",
+     * required=false,
+     * @OA\Schema(type="string", enum={"start_date", "price", "name", "created_at"})
+     * ),
+     * @OA\Parameter(
+     * name="sort_order",
+     * in="query",
+     * description="Sort direction",
+     * required=false,
+     * @OA\Schema(type="string", enum={"asc", "desc"})
+     * ),
+     * @OA\Parameter(
+     * name="per_page",
+     * in="query",
+     * description="Number of events per page",
+     * required=false,
+     * @OA\Schema(type="integer", example=6)
+     * ),
+     * @OA\Response(
+     * response=200,
+     * description="Successful operation",
+     * @OA\JsonContent(
+     * @OA\Property(property="success", type="boolean", example=true),
+     * @OA\Property(property="message", type="string", example="Events retrieved successfully"),
+     * @OA\Property(property="data", type="object",
+     * @OA\Property(property="data", type="array",
+     * @OA\Items(ref="#/components/schemas/EventResource")
+     * ),
+     * @OA\Property(property="current_page", type="integer", example=1),
+     * @OA\Property(property="last_page", type="integer", example=5),
+     * @OA\Property(property="per_page", type="integer", example=6),
+     * @OA\Property(property="total", type="integer", example=25),
+     * @OA\Property(property="from", type="integer", example=1),
+     * @OA\Property(property="to", type="integer", example=6),
+     * @OA\Property(property="has_more_pages", type="boolean", example=true)
+     * )
+     * )
+     * )
+     * )
+     *
+     * @OA\Schema(
+     * schema="EventResource",
+     * @OA\Property(property="id", type="integer", example=1),
+     * @OA\Property(property="name", type="string", example="Summer Music Festival"),
+     * @OA\Property(property="description", type="string", example="An outdoor music festival."),
+     * @OA\Property(property="location", type="string", example="Central Park"),
+     * @OA\Property(property="start_date", type="string", format="date-time", example="2025-07-20T10:00:00Z"),
+     * @OA\Property(property="price", type="number", format="float", example=50.00),
+     * @OA\Property(property="available_tickets", type="integer", example=150),
+     * @OA\Property(property="featured", type="boolean", example=true),
+     * @OA\Property(property="category_id", type="integer", example=2),
+     * @OA\Property(property="created_at", type="string", format="date-time", example="2025-06-01T12:00:00Z")
      * )
      */
-    public function index(Request $request): JsonResponse
-    {
-        $query = Event::with('category');
-        
-        // Filtriranje po kategoriji
-        if ($request->has('category_id')) {
-            $query->where('category_id', $request->category_id);
-        }
-        
-        // Filtriranje po dostupnosti ulaznica
-        if ($request->has('available_only') && $request->available_only) {
-            $query->where('available_tickets', '>', 0);
-        }
-        
-        // Sortiranje po datumu početka
-        $events = $query->orderBy('start_date', 'asc')->paginate(15);
-        
-        return response()->json($events);
+    // Update the index method in EventController
+public function index(Request $request): JsonResponse
+{
+    $query = Event::with('category');
+    
+    // Search functionality
+    if ($request->has('search') && $request->search) {
+        $searchTerm = $request->search;
+        $query->where(function($q) use ($searchTerm) {
+            $q->where('name', 'like', "%{$searchTerm}%")
+              ->orWhere('description', 'like', "%{$searchTerm}%")
+              ->orWhere('location', 'like', "%{$searchTerm}%");
+        });
     }
+    
+    // Category filter
+    if ($request->has('category_id') && $request->category_id) {
+        $query->where('category_id', $request->category_id);
+    }
+    
+    // Available tickets filter
+    if ($request->has('available_only') && $request->available_only === 'true') {
+        $query->where('available_tickets', '>', 0);
+    }
+    
+    // Featured filter
+    if ($request->has('featured') && $request->featured === 'true') {
+        $query->where('featured', true);
+    }
+    
+    // Sorting
+    $sortBy = $request->get('sort_by', 'start_date');
+    $sortOrder = $request->get('sort_order', 'asc');
+    
+    $allowedSortFields = ['start_date', 'price', 'name', 'created_at'];
+    if (in_array($sortBy, $allowedSortFields)) {
+        $query->orderBy($sortBy, $sortOrder);
+    }
+    
+    // Pagination
+    $perPage = $request->get('per_page', 6);
+    $perPage = min($perPage, 50); // Limit max per page
+    
+    $events = $query->paginate($perPage);
+    
+    return response()->json([
+        'success' => true,
+        'message' => 'Events retrieved successfully',
+        'data' => [
+            'data' => EventResource::collection($events->items()),
+            'current_page' => $events->currentPage(),
+            'last_page' => $events->lastPage(),
+            'per_page' => $events->perPage(),
+            'total' => $events->total(),
+            'from' => $events->firstItem(),
+            'to' => $events->lastItem(),
+            'has_more_pages' => $events->hasMorePages(),
+        ]
+    ]);
+}
+
 
  /**
      * @OA\Post(

@@ -1,102 +1,116 @@
 import React from "react";
-import Button from "../Button";
-import "./Pagination.css";
 
-const Pagination = ({
-  currentPage,
-  totalPages,
-  onPageChange,
-  showPageNumbers = true,
-  showFirstLast = true,
-  maxVisiblePages = 5,
-}) => {
-  // Funkcija za generisanje vidljivih stranica
-  const getVisiblePages = () => {
+const Pagination = ({ currentPage, totalPages, onPageChange }) => {
+  const getPageNumbers = () => {
     const pages = [];
-    const start = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
-    const end = Math.min(totalPages, start + maxVisiblePages - 1);
+    const maxPagesToShow = 5;
 
-    for (let i = start; i <= end; i++) {
+    let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
+    let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
+
+    // Adjust start page if we're near the end
+    if (endPage - startPage + 1 < maxPagesToShow) {
+      startPage = Math.max(1, endPage - maxPagesToShow + 1);
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
       pages.push(i);
     }
 
     return pages;
   };
 
-  if (totalPages <= 1) {
-    return null;
-  }
+  if (totalPages <= 1) return null;
 
   return (
-    <div className="pagination">
-      <div className="pagination-info">
-        Stranica {currentPage} od {totalPages}
-      </div>
-
-      <div className="pagination-controls">
-        {/* First page */}
-        {showFirstLast && currentPage > 1 && (
-          <Button
-            variant="outline"
-            size="small"
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        gap: "0.5rem",
+        margin: "2rem 0",
+        flexWrap: "wrap",
+      }}
+    >
+      {/* First page */}
+      {currentPage > 1 && (
+        <>
+          <button
             onClick={() => onPageChange(1)}
-            className="pagination-btn"
+            style={{
+              padding: "0.5rem 0.75rem",
+              border: "1px solid #ddd",
+              backgroundColor: "white",
+              cursor: "pointer",
+              borderRadius: "4px",
+            }}
           >
-            ⏮️
-          </Button>
-        )}
+            ««
+          </button>
+          <button
+            onClick={() => onPageChange(currentPage - 1)}
+            style={{
+              padding: "0.5rem 0.75rem",
+              border: "1px solid #ddd",
+              backgroundColor: "white",
+              cursor: "pointer",
+              borderRadius: "4px",
+            }}
+          >
+            ‹
+          </button>
+        </>
+      )}
 
-        {/* Previous page */}
-        <Button
-          variant="outline"
-          size="small"
-          onClick={() => onPageChange(currentPage - 1)}
-          disabled={currentPage === 1}
-          className="pagination-btn"
+      {/* Page numbers */}
+      {getPageNumbers().map((pageNum) => (
+        <button
+          key={pageNum}
+          onClick={() => onPageChange(pageNum)}
+          style={{
+            padding: "0.5rem 0.75rem",
+            border: "1px solid #ddd",
+            backgroundColor: pageNum === currentPage ? "#007bff" : "white",
+            color: pageNum === currentPage ? "white" : "#333",
+            cursor: "pointer",
+            borderRadius: "4px",
+            fontWeight: pageNum === currentPage ? "bold" : "normal",
+          }}
         >
-          ◀️ Prethodna
-        </Button>
+          {pageNum}
+        </button>
+      ))}
 
-        {/* Page numbers */}
-        {showPageNumbers && (
-          <div className="pagination-numbers">
-            {getVisiblePages().map((page) => (
-              <Button
-                key={page}
-                variant={page === currentPage ? "primary" : "outline"}
-                size="small"
-                onClick={() => onPageChange(page)}
-                className="pagination-number"
-              >
-                {page}
-              </Button>
-            ))}
-          </div>
-        )}
-
-        {/* Next page */}
-        <Button
-          variant="outline"
-          size="small"
-          onClick={() => onPageChange(currentPage + 1)}
-          disabled={currentPage === totalPages}
-          className="pagination-btn"
-        >
-          Sledeća ▶️
-        </Button>
-
-        {/* Last page */}
-        {showFirstLast && currentPage < totalPages && (
-          <Button
-            variant="outline"
-            size="small"
+      {/* Last page */}
+      {currentPage < totalPages && (
+        <>
+          <button
+            onClick={() => onPageChange(currentPage + 1)}
+            style={{
+              padding: "0.5rem 0.75rem",
+              border: "1px solid #ddd",
+              backgroundColor: "white",
+              cursor: "pointer",
+              borderRadius: "4px",
+            }}
+          >
+            ›
+          </button>
+          <button
             onClick={() => onPageChange(totalPages)}
-            className="pagination-btn"
+            style={{
+              padding: "0.5rem 0.75rem",
+              border: "1px solid #ddd",
+              backgroundColor: "white",
+              cursor: "pointer",
+              borderRadius: "4px",
+            }}
           >
-            ⏭️
-          </Button>
-        )}
-      </div>
+            »»
+          </button>
+        </>
+      )}
     </div>
   );
 };

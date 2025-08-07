@@ -148,15 +148,18 @@ export const apiService = {
     return await api.get("/user");
   },
 
-  // ... rest of existing methods remain the same
+  // Laravel paginated events
+  getEventsPaginated: async (queryString = "") => {
+    return await api.get(`/events?${queryString}`);
+  },
+
+  // Updated existing getEvents to work with Laravel pagination
   getEvents: async (page = 1, limit = 6) => {
-    const response = await api.get(`/events?page=${page}&limit=${limit}`);
-    return {
-      data: response.data || [],
-      totalEvents: response.data?.length || 0,
-      totalPages: Math.ceil((response.data?.length || 0) / limit),
-      currentPage: page,
-    };
+    const params = new URLSearchParams();
+    params.append("page", page);
+    params.append("per_page", limit);
+
+    return await api.get(`/events?${params.toString()}`);
   },
 
   getEventById: async (id) => {

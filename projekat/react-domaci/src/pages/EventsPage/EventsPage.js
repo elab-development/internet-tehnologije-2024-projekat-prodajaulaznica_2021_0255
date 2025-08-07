@@ -13,16 +13,21 @@ const EventsPage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // State for pagination
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalEvents, setTotalEvents] = useState(0);
-  const eventsPerPage = 6;
+  // State for Laravel pagination
+  const [paginationData, setPaginationData] = useState({
+    current_page: 1,
+    last_page: 1,
+    per_page: 6,
+    total: 0,
+    from: 0,
+    to: 0,
+  });
 
   // State for search and filtering
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [selectedCategory, setSelectedCategory] = useState("");
   const [categories, setCategories] = useState([]);
+  const [availableOnly, setAvailableOnly] = useState(false);
 
   // State for sorting
   const [sortBy, setSortBy] = useState("start_date");
@@ -47,45 +52,56 @@ const EventsPage = () => {
     loadCategories();
   }, []);
 
-  // Main function for loading events from Laravel API
-  const loadEvents = async (page = 1, search = "", category = "all") => {
+  // Main function for loading events with Laravel pagination
+  const loadEvents = async (page = 1) => {
     setLoading(true);
     setError(null);
 
     try {
-      let response;
+      // Build query parameters
+      const params = new URLSearchParams();
+      params.append("page", page);
+      params.append("per_page", paginationData.per_page);
 
-      if (search.trim() || category !== "all") {
-        // Use search API
-        response = await apiService.searchEvents(search, category);
-
-        if (response.success) {
-          const allResults = response.data || [];
-
-          // Manual pagination for search results
-          const startIndex = (page - 1) * eventsPerPage;
-          const endIndex = startIndex + eventsPerPage;
-          const paginatedResults = allResults.slice(startIndex, endIndex);
-
-          setEvents(paginatedResults);
-          setTotalEvents(allResults.length);
-          setTotalPages(Math.ceil(allResults.length / eventsPerPage));
-        }
-      } else {
-        // Use regular pagination API
-        response = await apiService.getEvents(page, eventsPerPage);
-
-        if (response.success) {
-          setEvents(response.data || []);
-          setTotalEvents(response.totalEvents || 0);
-          setTotalPages(response.totalPages || 1);
-        }
+      if (debouncedSearchTerm.trim()) {
+        params.append("search", debouncedSearchTerm);
       }
 
-      setCurrentPage(page);
+      if (selectedCategory) {
+        params.append("category_id", selectedCategory);
+      }
+
+      if (availableOnly) {
+        params.append("available_only", "true");
+      }
+
+      params.append("sort_by", sortBy);
+      params.append("sort_order", sortOrder);
+
+      const response = await apiService.getEventsPaginated(params.toString());
+
+      if (response.success) {
+        setEvents(response.data.data || []);
+        setPaginationData({
+          current_page: response.data.current_page || 1,
+          last_page: response.data.last_page || 1,
+          per_page: response.data.per_page || 6,
+          total: response.data.total || 0,
+          from: response.data.from || 0,
+          to: response.data.to || 0,
+        });
+      }
     } catch (err) {
       setError(err.message || "Greška pri učitavanju događaja");
       setEvents([]);
+      setPaginationData({
+        current_page: 1,
+        last_page: 1,
+        per_page: 6,
+        total: 0,
+        from: 0,
+        to: 0,
+      });
     } finally {
       setLoading(false);
     }
@@ -93,12 +109,12 @@ const EventsPage = () => {
 
   // Effect for loading events when filters change
   useEffect(() => {
-    loadEvents(1, debouncedSearchTerm, selectedCategory);
-  }, [debouncedSearchTerm, selectedCategory]);
+    loadEvents(1); // Reset to first page when filters change
+  }, [debouncedSearchTerm, selectedCategory, availableOnly, sortBy, sortOrder]);
 
   // Handle page change
   const handlePageChange = (page) => {
-    loadEvents(page, debouncedSearchTerm, selectedCategory);
+    loadEvents(page);
     // Scroll to top of page
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -106,39 +122,11 @@ const EventsPage = () => {
   // Handle reset filters
   const handleResetFilters = () => {
     setSearchTerm("");
-    setSelectedCategory("all");
+    setSelectedCategory("");
+    setAvailableOnly(false);
     setSortBy("start_date");
     setSortOrder("asc");
-    setCurrentPage(1);
   };
-
-  // Sort events (client-side for now)
-  const sortedEvents = [...events].sort((a, b) => {
-    let aValue, bValue;
-
-    switch (sortBy) {
-      case "price":
-        aValue = parseFloat(a.price) || 0;
-        bValue = parseFloat(b.price) || 0;
-        break;
-      case "start_date":
-        aValue = new Date(a.start_date);
-        bValue = new Date(b.start_date);
-        break;
-      case "name":
-        aValue = a.name?.toLowerCase() || "";
-        bValue = b.name?.toLowerCase() || "";
-        break;
-      default:
-        return 0;
-    }
-
-    if (sortOrder === "asc") {
-      return aValue > bValue ? 1 : -1;
-    } else {
-      return aValue < bValue ? 1 : -1;
-    }
-  });
 
   return (
     <div className="events-page">
@@ -156,7 +144,6 @@ const EventsPage = () => {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="search-input"
-            icon="🔍"
           />
 
           <div className="select-wrapper">
@@ -166,13 +153,24 @@ const EventsPage = () => {
               onChange={(e) => setSelectedCategory(e.target.value)}
               className="category-select"
             >
-              <option value="all">Sve kategorije</option>
+              <option value="">Sve kategorije</option>
               {categories.map((category) => (
                 <option key={category.id} value={category.id}>
                   {category.name}
                 </option>
               ))}
             </select>
+          </div>
+
+          <div className="checkbox-wrapper">
+            <label>
+              <input
+                type="checkbox"
+                checked={availableOnly}
+                onChange={(e) => setAvailableOnly(e.target.checked)}
+              />
+              Samo dostupni
+            </label>
           </div>
 
           <div className="select-wrapper">
@@ -185,6 +183,7 @@ const EventsPage = () => {
               <option value="start_date">Datum</option>
               <option value="price">Cena</option>
               <option value="name">Naziv</option>
+              <option value="created_at">Najnoviji</option>
             </select>
           </div>
 
@@ -216,18 +215,22 @@ const EventsPage = () => {
           {loading ? (
             <span>Učitavanje...</span>
           ) : (
-            <span>
-              Pronađeno {totalEvents} događaj{totalEvents !== 1 ? "a" : ""}
-              {(searchTerm || selectedCategory !== "all") && (
+            <div className="pagination-info">
+              <span>
+                Prikazano {paginationData.from}-{paginationData.to} od{" "}
+                {paginationData.total} događaja
+              </span>
+              {(searchTerm || selectedCategory || availableOnly) && (
                 <span className="filter-info">
-                  {searchTerm && ` za "${searchTerm}"`}
-                  {selectedCategory !== "all" &&
-                    ` u kategoriji "${
+                  {searchTerm && ` • Pretraga: "${searchTerm}"`}
+                  {selectedCategory &&
+                    ` • Kategorija: "${
                       categories.find((c) => c.id == selectedCategory)?.name
                     }"`}
+                  {availableOnly && ` • Samo dostupni`}
                 </span>
               )}
-            </span>
+            </div>
           )}
         </div>
 
@@ -243,11 +246,7 @@ const EventsPage = () => {
         {error && (
           <div className="error">
             <span>{error}</span>
-            <Button
-              onClick={() =>
-                loadEvents(1, debouncedSearchTerm, selectedCategory)
-              }
-            >
+            <Button onClick={() => loadEvents(paginationData.current_page)}>
               Pokušaj ponovo
             </Button>
           </div>
@@ -256,9 +255,9 @@ const EventsPage = () => {
         {/* Events grid */}
         {!loading && !error && (
           <>
-            {sortedEvents.length > 0 ? (
+            {events.length > 0 ? (
               <div className="events-grid">
-                {sortedEvents.map((event) => (
+                {events.map((event) => (
                   <EventCard key={event.id} event={event} />
                 ))}
               </div>
@@ -274,11 +273,11 @@ const EventsPage = () => {
           </>
         )}
 
-        {/* Pagination */}
-        {sortedEvents.length > 0 && totalPages > 1 && (
+        {/* Laravel Pagination */}
+        {events.length > 0 && paginationData.last_page > 1 && (
           <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
+            currentPage={paginationData.current_page}
+            totalPages={paginationData.last_page}
             onPageChange={handlePageChange}
           />
         )}

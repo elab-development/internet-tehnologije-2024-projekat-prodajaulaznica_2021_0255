@@ -343,6 +343,10 @@ export const apiService = {
   markTicketAsUsed: async (ticketId) => {
     return await api.patch(`/tickets/${ticketId}/use`);
   },
+
+  generateReceipt: async (ticketId) => {
+    return await api.get(`/tickets/${ticketId}/receipt`);
+  },
 };
 
 export default apiService;

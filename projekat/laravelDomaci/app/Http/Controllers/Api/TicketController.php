@@ -492,7 +492,7 @@ class TicketController extends Controller
         }
     }
 
-    /**
+   /**
      * @OA\Get(
      *     path="/api/tickets/my",
      *     summary="Get tickets for the authenticated user with filtering and pagination",
@@ -543,6 +543,27 @@ class TicketController extends Controller
      *         required=false,
      *         @OA\Schema(type="integer", minimum=1, default=1)
      *     ),
+     *     @OA\Parameter(
+     *         name="date_from",
+     *         in="query",
+     *         description="Filter by purchase date from",
+     *         required=false,
+     *         @OA\Schema(type="string", format="date", example="2024-01-01")
+     *     ),
+     *     @OA\Parameter(
+     *         name="date_to",
+     *         in="query",
+     *         description="Filter by purchase date to",
+     *         required=false,
+     *         @OA\Schema(type="string", format="date", example="2024-12-31")
+     *     ),
+     *     @OA\Parameter(
+     *         name="category_id",
+     *         in="query",
+     *         description="Filter by event category",
+     *         required=false,
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
      *    
      *     @OA\Response(
      *         response=200,
@@ -556,7 +577,9 @@ class TicketController extends Controller
      *                     @OA\Property(property="current_page", type="integer", example=1),
      *                     @OA\Property(property="last_page", type="integer", example=5),
      *                     @OA\Property(property="per_page", type="integer", example=10),
-     *                     @OA\Property(property="total", type="integer", example=45)
+     *                     @OA\Property(property="total", type="integer", example=45),
+     *                     @OA\Property(property="from", type="integer", example=1),
+     *                     @OA\Property(property="to", type="integer", example=10)
      *                 ),
      *                 @OA\Property(property="stats", type="object",
      *                     @OA\Property(property="total", type="integer", example=45),
@@ -564,7 +587,30 @@ class TicketController extends Controller
      *                     @OA\Property(property="used", type="integer", example=30),
      *                     @OA\Property(property="cancelled", type="integer", example=3),
      *                     @OA\Property(property="total_spent", type="number", format="float", example=1250.75),
-     *                     @OA\Property(property="upcoming_events", type="integer", example=5)
+     *                     @OA\Property(property="upcoming_events", type="integer", example=5),
+     *                     @OA\Property(property="monthly_spending", type="array",
+     *                         @OA\Items(type="object",
+     *                             @OA\Property(property="month", type="string", example="2024-01"),
+     *                             @OA\Property(property="amount", type="number", format="float", example=150.00),
+     *                             @OA\Property(property="tickets_count", type="integer", example=3)
+     *                         )
+     *                     )
+     *                 ),
+     *                 @OA\Property(property="filters", type="object",
+     *                     @OA\Property(property="applied", type="object",
+     *                         @OA\Property(property="status", type="string", example="active"),
+     *                         @OA\Property(property="search", type="string", example="music"),
+     *                         @OA\Property(property="date_from", type="string", example="2024-01-01"),
+     *                         @OA\Property(property="date_to", type="string", example="2024-12-31"),
+     *                         @OA\Property(property="category_id", type="integer", example=1)
+     *                     ),
+     *                     @OA\Property(property="available_categories", type="array",
+     *                         @OA\Items(type="object",
+     *                             @OA\Property(property="id", type="integer", example=1),
+     *                             @OA\Property(property="name", type="string", example="Music"),
+     *                             @OA\Property(property="tickets_count", type="integer", example=15)
+     *                         )
+     *                     )
      *                 )
      *             )
      *         )
@@ -600,6 +646,22 @@ class TicketController extends Controller
                 });
             }
 
+            // Date range filter
+            if ($request->has('date_from') && $request->date_from) {
+                $query->whereDate('purchase_date', '>=', $request->date_from);
+            }
+
+            if ($request->has('date_to') && $request->date_to) {
+                $query->whereDate('purchase_date', '<=', $request->date_to);
+            }
+
+            // Category filter
+            if ($request->has('category_id') && $request->category_id) {
+                $query->whereHas('event', function($q) use ($request) {
+                    $q->where('category_id', $request->category_id);
+                });
+            }
+
             // Apply sorting
             $sortBy = $request->get('sortBy', 'purchase_date');
             $sortOrder = $request->get('sortOrder', 'desc');
@@ -627,6 +689,20 @@ class TicketController extends Controller
             // Get user ticket statistics
             $stats = $this->getUserTicketStats(auth()->id());
 
+            // Get available categories for filtering
+            $availableCategories = $this->getAvailableCategories(auth()->id());
+
+            // Applied filters for frontend
+            $appliedFilters = [
+                'status' => $request->get('status', 'all'),
+                'search' => $request->get('search'),
+                'date_from' => $request->get('date_from'),
+                'date_to' => $request->get('date_to'),
+                'category_id' => $request->get('category_id'),
+                'sortBy' => $sortBy,
+                'sortOrder' => $sortOrder
+            ];
+
             return response()->json([
                 'success' => true,
                 'message' => 'User tickets retrieved successfully',
@@ -637,8 +713,14 @@ class TicketController extends Controller
                         'last_page' => $tickets->lastPage(),
                         'per_page' => $tickets->perPage(),
                         'total' => $tickets->total(),
+                        'from' => $tickets->firstItem(),
+                        'to' => $tickets->lastItem(),
                     ],
-                    'stats' => $stats
+                    'stats' => $stats,
+                    'filters' => [
+                        'applied' => $appliedFilters,
+                        'available_categories' => $availableCategories
+                    ]
                 ]
             ]);
 
@@ -652,12 +734,29 @@ class TicketController extends Controller
     }
 
     /**
-     * Add method for user ticket statistics
+     * Enhanced method for user ticket statistics with monthly spending
      */
     private function getUserTicketStats($userId): array
     {
         $tickets = Ticket::where('user_id', $userId);
-       
+        
+        // Monthly spending for the last 12 months
+        $monthlySpending = Ticket::where('user_id', $userId)
+            ->selectRaw('DATE_FORMAT(purchase_date, "%Y-%m") as month')
+            ->selectRaw('SUM(price) as amount')
+            ->selectRaw('COUNT(*) as tickets_count')
+            ->where('purchase_date', '>=', now()->subMonths(12))
+            ->groupBy('month')
+            ->orderBy('month', 'desc')
+            ->get()
+            ->map(function($item) {
+                return [
+                    'month' => $item->month,
+                    'amount' => (float) $item->amount,
+                    'tickets_count' => $item->tickets_count
+                ];
+            });
+
         return [
             'total' => $tickets->count(),
             'active' => $tickets->where('status', 'active')->count(),
@@ -667,8 +766,503 @@ class TicketController extends Controller
             'upcoming_events' => $tickets->where('status', 'active')
                 ->whereHas('event', function($q) {
                     $q->where('start_date', '>', now());
-                })->count()
+                })->count(),
+            'monthly_spending' => $monthlySpending
         ];
+    }
+
+    /**
+     * Get available categories for user's tickets
+     */
+    private function getAvailableCategories($userId): array
+    {
+        return DB::table('tickets')
+            ->join('events', 'tickets.event_id', '=', 'events.id')
+            ->join('categories', 'events.category_id', '=', 'categories.id')
+            ->where('tickets.user_id', $userId)
+            ->select('categories.id', 'categories.name')
+            ->selectRaw('COUNT(tickets.id) as tickets_count')
+            ->groupBy('categories.id', 'categories.name')
+            ->orderBy('categories.name')
+            ->get()
+            ->map(function($item) {
+                return [
+                    'id' => $item->id,
+                    'name' => $item->name,
+                    'tickets_count' => $item->tickets_count
+                ];
+            })
+            ->toArray();
+    }
+
+      /**
+     * @OA\Get(
+     *     path="/api/tickets/{id}/receipt",
+     *     summary="Generate receipt for a ticket purchase",
+     *     description="Generates a detailed receipt for a specific ticket purchase including all transaction details",
+     *     operationId="generateReceipt",
+     *     tags={"Tickets"},
+     *     security={{"sanctum":{}}},
+     *    
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="Ticket ID",
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
+     *    
+     *     @OA\Response(
+     *         response=200,
+     *         description="Receipt generated successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Receipt generated successfully"),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="receipt_number", type="string", example="RCP-ABC12345"),
+     *                 @OA\Property(property="issue_date", type="string", format="date-time"),
+     *                 @OA\Property(property="ticket", type="object",
+     *                     @OA\Property(property="ticket_number", type="string", example="TKT-ABC12345"),
+     *                     @OA\Property(property="price", type="number", format="float", example=90.00),
+     *                     @OA\Property(property="original_price", type="number", format="float", example=100.00),
+     *                     @OA\Property(property="discount_percentage", type="number", format="float", example=10),
+     *                     @OA\Property(property="discount_amount", type="number", format="float", example=10.00),
+     *                     @OA\Property(property="status", type="string", example="active"),
+     *                     @OA\Property(property="purchase_date", type="string", format="date-time")
+     *                 ),
+     *                 @OA\Property(property="event", type="object",
+     *                     @OA\Property(property="name", type="string", example="Summer Music Festival"),
+     *                     @OA\Property(property="start_date", type="string", format="date-time"),
+     *                     @OA\Property(property="location", type="string", example="Central Park"),
+     *                     @OA\Property(property="category", type="string", example="Music")
+     *                 ),
+     *                 @OA\Property(property="customer", type="object",
+     *                     @OA\Property(property="name", type="string", example="John Doe"),
+     *                     @OA\Property(property="email", type="string", example="john@example.com")
+     *                 ),
+     *                 @OA\Property(property="company", type="object",
+     *                     @OA\Property(property="name", type="string", example="TicketMaster Pro"),
+     *                     @OA\Property(property="address", type="string", example="Knez Mihailova 42, Beograd"),
+     *                     @OA\Property(property="tax_number", type="string", example="123456789"),
+     *                     @OA\Property(property="phone", type="string", example="+381 11 123 4567")
+     *                 ),
+     *                 @OA\Property(property="payment_details", type="object",
+     *                     @OA\Property(property="subtotal", type="number", format="float", example=100.00),
+     *                     @OA\Property(property="discount", type="number", format="float", example=10.00),
+     *                     @OA\Property(property="tax_rate", type="number", format="float", example=20),
+     *                     @OA\Property(property="tax_amount", type="number", format="float", example=18.00),
+     *                     @OA\Property(property="total", type="number", format="float", example=90.00)
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Ticket not found",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Ticket not found"),
+     *             @OA\Property(property="data", type="null")
+     *         )
+     *     )
+     * )
+     */
+    public function generateReceipt($id): JsonResponse
+    {
+        try {
+            $ticket = Ticket::with(['event.category', 'user'])
+                ->where('user_id', auth()->id())
+                ->findOrFail($id);
+
+            // Calculate payment details
+            $originalPrice = $ticket->event->price;
+            $discountAmount = $originalPrice * ($ticket->discount_percentage / 100);
+            $subtotal = $originalPrice - $discountAmount;
+            $taxRate = 20; // 20% PDV
+            $taxAmount = $subtotal * ($taxRate / 100);
+            $total = $ticket->price;
+
+            $receiptData = [
+                'receipt_number' => 'RCP-' . strtoupper(Str::random(8)),
+                'issue_date' => now()->toISOString(),
+                'ticket' => [
+                    'ticket_number' => $ticket->ticket_number,
+                    'price' => $ticket->price,
+                    'original_price' => $originalPrice,
+                    'discount_percentage' => $ticket->discount_percentage,
+                    'discount_amount' => $discountAmount,
+                    'status' => $ticket->status,
+                    'purchase_date' => $ticket->purchase_date,
+                ],
+                'event' => [
+                    'name' => $ticket->event->name,
+                    'start_date' => $ticket->event->start_date,
+                    'location' => $ticket->event->location,
+                    'category' => $ticket->event->category->name,
+                ],
+                'customer' => [
+                    'name' => $ticket->user->name,
+                    'email' => $ticket->user->email,
+                ],
+                'company' => [
+                    'name' => 'TicketMaster Pro',
+                    'address' => 'Knez Mihailova 42, Beograd',
+                    'tax_number' => '123456789',
+                    'phone' => '+381 11 123 4567',
+                ],
+                'payment_details' => [
+                    'subtotal' => $originalPrice,
+                    'discount' => $discountAmount,
+                    'tax_rate' => $taxRate,
+                    'tax_amount' => $taxAmount,
+                    'total' => $total
+                ]
+            ];
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Receipt generated successfully',
+                'data' => $receiptData
+            ]);
+
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Ticket not found',
+                'data' => null
+            ], 404);
+        }
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/tickets/purchase-history/export",
+     *     summary="Export purchase history",
+     *     description="Exports user's purchase history in various formats (CSV, PDF, Excel)",
+     *     operationId="exportPurchaseHistory",
+     *     tags={"Tickets"},
+     *     security={{"sanctum":{}}},
+     *    
+     *     @OA\Parameter(
+     *         name="format",
+     *         in="query",
+     *         description="Export format",
+     *         required=false,
+     *         @OA\Schema(type="string", enum={"csv", "pdf", "excel"}, default="csv")
+     *     ),
+     *     @OA\Parameter(
+     *         name="date_from",
+     *         in="query",
+     *         description="Export from date",
+     *         required=false,
+     *         @OA\Schema(type="string", format="date")
+     *     ),
+     *     @OA\Parameter(
+     *         name="date_to",
+     *         in="query",
+     *         description="Export to date",
+     *         required=false,
+     *         @OA\Schema(type="string", format="date")
+     *     ),
+     *    
+     *     @OA\Response(
+     *         response=200,
+     *         description="Export data prepared successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Export data prepared successfully"),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="export_url", type="string", example="https://example.com/exports/purchase-history-123.csv"),
+     *                 @OA\Property(property="filename", type="string", example="purchase-history-2024-01-15.csv"),
+     *                 @OA\Property(property="format", type="string", example="csv"),
+     *                 @OA\Property(property="total_records", type="integer", example=45),
+     *                 @OA\Property(property="date_range", type="object",
+     *                     @OA\Property(property="from", type="string", example="2024-01-01"),
+     *                     @OA\Property(property="to", type="string", example="2024-12-31")
+     *                 )
+     *             )
+     *         )
+     *     )
+     * )
+     */
+    public function exportPurchaseHistory(Request $request): JsonResponse
+    {
+        try {
+            $format = $request->get('format', 'csv');
+            $dateFrom = $request->get('date_from');
+            $dateTo = $request->get('date_to');
+
+            $query = Ticket::with(['event.category'])
+                ->where('user_id', auth()->id());
+
+            if ($dateFrom) {
+                $query->whereDate('purchase_date', '>=', $dateFrom);
+            }
+
+            if ($dateTo) {
+                $query->whereDate('purchase_date', '<=', $dateTo);
+            }
+
+            $tickets = $query->orderBy('purchase_date', 'desc')->get();
+
+            // Prepare export data
+            $exportData = $tickets->map(function($ticket) {
+                return [
+                    'Ticket Number' => $ticket->ticket_number,
+                    'Event Name' => $ticket->event->name,
+                    'Event Date' => $ticket->event->start_date->format('Y-m-d H:i'),
+                    'Location' => $ticket->event->location,
+                    'Category' => $ticket->event->category->name,
+                    'Price' => $ticket->price,
+                    'Discount %' => $ticket->discount_percentage,
+                    'Status' => ucfirst($ticket->status),
+                    'Purchase Date' => $ticket->purchase_date->format('Y-m-d H:i'),
+                ];
+            });
+
+            // Generate filename
+            $dateRange = '';
+            if ($dateFrom && $dateTo) {
+                $dateRange = "-{$dateFrom}-to-{$dateTo}";
+            } elseif ($dateFrom) {
+                $dateRange = "-from-{$dateFrom}";
+            } elseif ($dateTo) {
+                $dateRange = "-until-{$dateTo}";
+            }
+
+            $filename = "purchase-history{$dateRange}-" . now()->format('Y-m-d') . ".{$format}";
+
+            // In a real implementation, you would generate the actual file here
+            // For now, we'll return the data structure that the frontend can use
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Export data prepared successfully',
+                'data' => [
+                    'export_data' => $exportData,
+                    'filename' => $filename,
+                    'format' => $format,
+                    'total_records' => $tickets->count(),
+                    'date_range' => [
+                        'from' => $dateFrom,
+                        'to' => $dateTo
+                    ]
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error preparing export data',
+                'data' => null
+            ], 500);
+        }
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/tickets/purchase-summary",
+     *     summary="Get purchase summary analytics",
+     *     description="Retrieves comprehensive analytics about user's ticket purchases including spending patterns and trends",
+     *     operationId="getPurchaseSummary",
+     *     tags={"Tickets"},
+     *     security={{"sanctum":{}}},
+     *    
+     *     @OA\Parameter(
+     *         name="period",
+     *         in="query",
+     *         description="Analysis period",
+     *         required=false,
+     *         @OA\Schema(type="string", enum={"last_month", "last_3_months", "last_6_months", "last_year", "all_time"}, default="last_year")
+     *     ),
+     *    
+     *     @OA\Response(
+     *         response=200,
+     *         description="Purchase summary retrieved successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Purchase summary retrieved successfully"),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="overview", type="object",
+     *                     @OA\Property(property="total_spent", type="number", format="float", example=1250.75),
+     *                     @OA\Property(property="total_tickets", type="integer", example=45),
+     *                     @OA\Property(property="average_ticket_price", type="number", format="float", example=27.79),
+     *                     @OA\Property(property="total_savings", type="number", format="float", example=125.50),
+     *                     @OA\Property(property="favorite_category", type="string", example="Music")
+     *                 ),
+     *                 @OA\Property(property="monthly_breakdown", type="array",
+     *                     @OA\Items(type="object",
+     *                         @OA\Property(property="month", type="string", example="2024-01"),
+     *                         @OA\Property(property="spent", type="number", format="float", example=150.00),
+     *                         @OA\Property(property="tickets", type="integer", example=3),
+     *                         @OA\Property(property="events_attended", type="integer", example=2)
+     *                     )
+     *                 ),
+     *                 @OA\Property(property="category_breakdown", type="array",
+     *                     @OA\Items(type="object",
+     *                         @OA\Property(property="category", type="string", example="Music"),
+     *                         @OA\Property(property="tickets", type="integer", example=15),
+     *                         @OA\Property(property="spent", type="number", format="float", example=450.00),
+     *                         @OA\Property(property="percentage", type="number", format="float", example=36.0)
+     *                     )
+     *                 ),
+     *                 @OA\Property(property="trends", type="object",
+     *                     @OA\Property(property="spending_trend", type="string", example="increasing"),
+     *                     @OA\Property(property="most_active_month", type="string", example="December"),
+     *                     @OA\Property(property="preferred_price_range", type="string", example="20-50 EUR")
+     *                 )
+     *             )
+     *         )
+     *     )
+     * )
+     */
+    public function getPurchaseSummary(Request $request): JsonResponse
+    {
+        try {
+            $period = $request->get('period', 'last_year');
+            $userId = auth()->id();
+
+            // Define date range based on period
+            $dateFrom = match($period) {
+                'last_month' => now()->subMonth(),
+                'last_3_months' => now()->subMonths(3),
+                'last_6_months' => now()->subMonths(6),
+                'last_year' => now()->subYear(),
+                default => null
+            };
+
+            $query = Ticket::with(['event.category'])
+                ->where('user_id', $userId);
+
+            if ($dateFrom) {
+                $query->where('purchase_date', '>=', $dateFrom);
+            }
+
+            $tickets = $query->get();
+
+            // Overview calculations
+            $totalSpent = $tickets->sum('price');
+            $totalTickets = $tickets->count();
+            $averageTicketPrice = $totalTickets > 0 ? $totalSpent / $totalTickets : 0;
+            
+            // Calculate total savings (original price - paid price)
+            $totalSavings = $tickets->sum(function($ticket) {
+                $originalPrice = $ticket->event->price;
+                return $originalPrice - $ticket->price;
+            });
+
+            // Favorite category
+            $favoriteCategory = $tickets->groupBy('event.category.name')
+                ->map(function($categoryTickets) {
+                    return $categoryTickets->count();
+                })
+                ->sortDesc()
+                ->keys()
+                ->first() ?? 'N/A';
+
+            // Monthly breakdown
+            $monthlyBreakdown = $tickets->groupBy(function($ticket) {
+                return $ticket->purchase_date->format('Y-m');
+            })->map(function($monthTickets, $month) {
+                return [
+                    'month' => $month,
+                    'spent' => $monthTickets->sum('price'),
+                    'tickets' => $monthTickets->count(),
+                    'events_attended' => $monthTickets->where('status', 'used')->count()
+                ];
+            })->values();
+
+            // Category breakdown
+            $categoryBreakdown = $tickets->groupBy('event.category.name')
+                ->map(function($categoryTickets, $category) use ($totalSpent) {
+                    $categorySpent = $categoryTickets->sum('price');
+                    return [
+                        'category' => $category,
+                        'tickets' => $categoryTickets->count(),
+                        'spent' => $categorySpent,
+                        'percentage' => $totalSpent > 0 ? ($categorySpent / $totalSpent) * 100 : 0
+                    ];
+                })->values();
+
+            // Trends analysis
+            $spendingTrend = $this->calculateSpendingTrend($monthlyBreakdown);
+            $mostActiveMonth = $monthlyBreakdown->sortByDesc('tickets')->first()['month'] ?? 'N/A';
+            $preferredPriceRange = $this->calculatePreferredPriceRange($tickets);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Purchase summary retrieved successfully',
+                'data' => [
+                    'overview' => [
+                        'total_spent' => round($totalSpent, 2),
+                        'total_tickets' => $totalTickets,
+                        'average_ticket_price' => round($averageTicketPrice, 2),
+                        'total_savings' => round($totalSavings, 2),
+                        'favorite_category' => $favoriteCategory
+                    ],
+                    'monthly_breakdown' => $monthlyBreakdown,
+                    'category_breakdown' => $categoryBreakdown,
+                    'trends' => [
+                        'spending_trend' => $spendingTrend,
+                        'most_active_month' => $mostActiveMonth,
+                        'preferred_price_range' => $preferredPriceRange
+                    ]
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error retrieving purchase summary',
+                'data' => null
+            ], 500);
+        }
+    }
+
+    /**
+     * Calculate spending trend
+     */
+    private function calculateSpendingTrend($monthlyBreakdown): string
+    {
+        if ($monthlyBreakdown->count() < 2) {
+            return 'insufficient_data';
+        }
+
+        $recent = $monthlyBreakdown->take(3)->avg('spent');
+        $older = $monthlyBreakdown->skip(3)->take(3)->avg('spent');
+
+        if ($recent > $older * 1.1) {
+            return 'increasing';
+        } elseif ($recent < $older * 0.9) {
+            return 'decreasing';
+        } else {
+            return 'stable';
+        }
+    }
+
+    /**
+     * Calculate preferred price range
+     */
+    private function calculatePreferredPriceRange($tickets): string
+    {
+        if ($tickets->isEmpty()) {
+            return 'N/A';
+        }
+
+        $prices = $tickets->pluck('price')->sort();
+        $count = $prices->count();
+        
+        // Find the range where most tickets fall
+        $ranges = [
+            '0-20' => $prices->filter(fn($p) => $p <= 20)->count(),
+            '20-50' => $prices->filter(fn($p) => $p > 20 && $p <= 50)->count(),
+            '50-100' => $prices->filter(fn($p) => $p > 50 && $p <= 100)->count(),
+            '100+' => $prices->filter(fn($p) => $p > 100)->count(),
+        ];
+
+        $preferredRange = collect($ranges)->sortDesc()->keys()->first();
+        
+        return $preferredRange . ' EUR';
     }
 
     /**

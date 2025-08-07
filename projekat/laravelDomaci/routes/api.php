@@ -68,6 +68,8 @@ Route::middleware('auth:sanctum')->group(function () {
      // QR code management
     Route::get('tickets/{id}/qr-code', [TicketController::class, 'getQRCode']);
     Route::get('tickets/{id}/pdf', [TicketController::class, 'generateTicketPDF']);
+    Route::get('tickets/{id}/receipt', [TicketController::class, 'generateReceipt']);
+
 });
 
 // Debug route for testing

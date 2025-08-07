@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from "react";
 import EventCard from "../../components/common/EventCard";
-import InputField from "../../components/common/InputField";
 import Pagination from "../../components/common/Pagination";
 import Button from "../../components/common/Button";
 import apiService from "../../services/api";
-import useDebounce from "../../hooks/useDebounce";
+import AdvancedSearch from "../../components/common/AdvancedSearch";
 import "./EventsPage.css";
 
 const EventsPage = () => {
@@ -12,6 +11,9 @@ const EventsPage = () => {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // State for current filters, managed by the AdvancedSearch component
+  const [currentFilters, setCurrentFilters] = useState({});
 
   // State for Laravel pagination
   const [paginationData, setPaginationData] = useState({
@@ -23,20 +25,10 @@ const EventsPage = () => {
     to: 0,
   });
 
-  // State for search and filtering
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("");
+  // State for categories
   const [categories, setCategories] = useState([]);
-  const [availableOnly, setAvailableOnly] = useState(false);
 
-  // State for sorting
-  const [sortBy, setSortBy] = useState("start_date");
-  const [sortOrder, setSortOrder] = useState("asc");
-
-  // Debounced search term for optimization
-  const debouncedSearchTerm = useDebounce(searchTerm, 500);
-
-  // Load categories from Laravel API
+  // Load categories from Laravel API on component mount
   useEffect(() => {
     const loadCategories = async () => {
       try {
@@ -52,31 +44,24 @@ const EventsPage = () => {
     loadCategories();
   }, []);
 
-  // Main function for loading events with Laravel pagination
-  const loadEvents = async (page = 1) => {
+  // Main function for loading events with filters and Laravel pagination
+  // This function now accepts filters as an argument
+  const loadEventsWithFilters = async (page = 1, filters = {}) => {
     setLoading(true);
     setError(null);
 
     try {
-      // Build query parameters
+      // Build query parameters based on the provided filters
       const params = new URLSearchParams();
       params.append("page", page);
       params.append("per_page", paginationData.per_page);
 
-      if (debouncedSearchTerm.trim()) {
-        params.append("search", debouncedSearchTerm);
-      }
-
-      if (selectedCategory) {
-        params.append("category_id", selectedCategory);
-      }
-
-      if (availableOnly) {
-        params.append("available_only", "true");
-      }
-
-      params.append("sort_by", sortBy);
-      params.append("sort_order", sortOrder);
+      // Add all filters to the search parameters
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== "" && value !== null && value !== undefined) {
+          params.append(key, value);
+        }
+      });
 
       const response = await apiService.getEventsPaginated(params.toString());
 
@@ -109,24 +94,19 @@ const EventsPage = () => {
 
   // Effect for loading events when filters change
   useEffect(() => {
-    loadEvents(1); // Reset to first page when filters change
-  }, [debouncedSearchTerm, selectedCategory, availableOnly, sortBy, sortOrder]);
+    // Reset to the first page when filters change
+    loadEventsWithFilters(1, currentFilters);
+  }, [currentFilters]);
 
-  // Handle page change
+  // Handle page change, passing the current filters
   const handlePageChange = (page) => {
-    loadEvents(page);
-    // Scroll to top of page
+    loadEventsWithFilters(page, currentFilters);
+    // Scroll to top of page for better UX
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // Handle reset filters
-  const handleResetFilters = () => {
-    setSearchTerm("");
-    setSelectedCategory("");
-    setAvailableOnly(false);
-    setSortBy("start_date");
-    setSortOrder("asc");
-  };
+  // The AdvancedSearch component now handles all the filter logic internally,
+  // so the old individual states and reset function are no longer needed here.
 
   return (
     <div className="events-page">
@@ -136,78 +116,13 @@ const EventsPage = () => {
         <p>Pronađite savršen događaj za vas</p>
       </div>
 
-      {/* Filters and search */}
-      <div className="events-filters">
-        <div className="filter-row">
-          <InputField
-            placeholder="Pretražite događaje..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="search-input"
-          />
-
-          <div className="select-wrapper">
-            <label>Kategorija:</label>
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="category-select"
-            >
-              <option value="">Sve kategorije</option>
-              {categories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="checkbox-wrapper">
-            <label>
-              <input
-                type="checkbox"
-                checked={availableOnly}
-                onChange={(e) => setAvailableOnly(e.target.checked)}
-              />
-              Samo dostupni
-            </label>
-          </div>
-
-          <div className="select-wrapper">
-            <label>Sortiraj po:</label>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="sort-select"
-            >
-              <option value="start_date">Datum</option>
-              <option value="price">Cena</option>
-              <option value="name">Naziv</option>
-              <option value="created_at">Najnoviji</option>
-            </select>
-          </div>
-
-          <div className="select-wrapper">
-            <label>Redosled:</label>
-            <select
-              value={sortOrder}
-              onChange={(e) => setSortOrder(e.target.value)}
-              className="order-select"
-            >
-              <option value="asc">Rastući</option>
-              <option value="desc">Opadajući</option>
-            </select>
-          </div>
-
-          <Button
-            variant="outline"
-            onClick={handleResetFilters}
-            className="reset-btn"
-          >
-            Resetuj filtere
-          </Button>
-        </div>
-      </div>
+      {/* Replaced old filters section with AdvancedSearch component */}
+      <AdvancedSearch
+        onSearch={(filters) => {
+          setCurrentFilters(filters);
+        }}
+        categories={categories}
+      />
 
       {/* Results */}
       <div className="events-results">
@@ -220,16 +135,6 @@ const EventsPage = () => {
                 Prikazano {paginationData.from}-{paginationData.to} od{" "}
                 {paginationData.total} događaja
               </span>
-              {(searchTerm || selectedCategory || availableOnly) && (
-                <span className="filter-info">
-                  {searchTerm && ` • Pretraga: "${searchTerm}"`}
-                  {selectedCategory &&
-                    ` • Kategorija: "${
-                      categories.find((c) => c.id == selectedCategory)?.name
-                    }"`}
-                  {availableOnly && ` • Samo dostupni`}
-                </span>
-              )}
             </div>
           )}
         </div>
@@ -246,7 +151,14 @@ const EventsPage = () => {
         {error && (
           <div className="error">
             <span>{error}</span>
-            <Button onClick={() => loadEvents(paginationData.current_page)}>
+            <Button
+              onClick={() =>
+                loadEventsWithFilters(
+                  paginationData.current_page,
+                  currentFilters
+                )
+              }
+            >
               Pokušaj ponovo
             </Button>
           </div>
@@ -265,7 +177,7 @@ const EventsPage = () => {
               <div className="no-events">
                 <h3>Nema događaja</h3>
                 <p>Nema događaja koji odgovaraju vašim kriterijumima.</p>
-                <Button onClick={handleResetFilters}>
+                <Button onClick={() => setCurrentFilters({})}>
                   Prikaži sve događaje
                 </Button>
               </div>

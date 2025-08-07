@@ -11,15 +11,15 @@ use App\Http\Resources\EventResource;
 
 class EventController extends Controller
 {
-/**
+    /**
      * @OA\Get(
      * path="/api/events",
      * summary="Get a list of events with filtering, sorting, and pagination",
      * tags={"Events"},
      * @OA\Parameter(
-     * name="search_term",
+     * name="search",
      * in="query",
-     * description="Search term for event name, location, and description",
+     * description="Search term for event name, location, description, or category name",
      * required=false,
      * @OA\Schema(type="string")
      * ),
@@ -29,6 +29,41 @@ class EventController extends Controller
      * description="Filter events by category ID",
      * required=false,
      * @OA\Schema(type="integer")
+     * ),
+     * @OA\Parameter(
+     * name="min_price",
+     * in="query",
+     * description="Filter events by minimum price",
+     * required=false,
+     * @OA\Schema(type="number", format="float")
+     * ),
+     * @OA\Parameter(
+     * name="max_price",
+     * in="query",
+     * description="Filter events by maximum price",
+     * required=false,
+     * @OA\Schema(type="number", format="float")
+     * ),
+     * @OA\Parameter(
+     * name="start_date",
+     * in="query",
+     * description="Filter events by start date (format: YYYY-MM-DD)",
+     * required=false,
+     * @OA\Schema(type="string", format="date")
+     * ),
+     * @OA\Parameter(
+     * name="end_date",
+     * in="query",
+     * description="Filter events by end date (format: YYYY-MM-DD)",
+     * required=false,
+     * @OA\Schema(type="string", format="date")
+     * ),
+     * @OA\Parameter(
+     * name="location",
+     * in="query",
+     * description="Filter events by location (partial match)",
+     * required=false,
+     * @OA\Schema(type="string")
      * ),
      * @OA\Parameter(
      * name="available_only",
@@ -45,11 +80,18 @@ class EventController extends Controller
      * @OA\Schema(type="string", enum={"true"})
      * ),
      * @OA\Parameter(
+     * name="active_only",
+     * in="query",
+     * description="Filter to show only events that have not yet ended",
+     * required=false,
+     * @OA\Schema(type="string", enum={"true"})
+     * ),
+     * @OA\Parameter(
      * name="sort_by",
      * in="query",
      * description="Field to sort by",
      * required=false,
-     * @OA\Schema(type="string", enum={"start_date", "price", "name", "created_at"})
+     * @OA\Schema(type="string", enum={"start_date", "price", "name", "created_at", "available_tickets"})
      * ),
      * @OA\Parameter(
      * name="sort_order",
@@ -86,81 +128,189 @@ class EventController extends Controller
      * )
      * )
      * )
-     *
-     * @OA\Schema(
-     * schema="EventResource",
-     * @OA\Property(property="id", type="integer", example=1),
-     * @OA\Property(property="name", type="string", example="Summer Music Festival"),
-     * @OA\Property(property="description", type="string", example="An outdoor music festival."),
-     * @OA\Property(property="location", type="string", example="Central Park"),
-     * @OA\Property(property="start_date", type="string", format="date-time", example="2025-07-20T10:00:00Z"),
-     * @OA\Property(property="price", type="number", format="float", example=50.00),
-     * @OA\Property(property="available_tickets", type="integer", example=150),
-     * @OA\Property(property="featured", type="boolean", example=true),
-     * @OA\Property(property="category_id", type="integer", example=2),
-     * @OA\Property(property="created_at", type="string", format="date-time", example="2025-06-01T12:00:00Z")
+     */
+    public function index(Request $request): JsonResponse
+    {
+        $query = Event::with('category');
+        
+        // Advanced search functionality
+        if ($request->has('search') && $request->search) {
+            $searchTerm = $request->search;
+            $query->where(function($q) use ($searchTerm) {
+                $q->where('name', 'like', "%{$searchTerm}%")
+                ->orWhere('description', 'like', "%{$searchTerm}%")
+                ->orWhere('location', 'like', "%{$searchTerm}%")
+                ->orWhereHas('category', function($categoryQuery) use ($searchTerm) {
+                    $categoryQuery->where('name', 'like', "%{$searchTerm}%");
+                });
+            });
+        }
+        
+        // Category filter
+        if ($request->has('category_id') && $request->category_id) {
+            $query->where('category_id', $request->category_id);
+        }
+        
+        // Price range filter
+        if ($request->has('min_price') && is_numeric($request->min_price)) {
+            $query->where('price', '>=', $request->min_price);
+        }
+        
+        if ($request->has('max_price') && is_numeric($request->max_price)) {
+            $query->where('price', '<=', $request->max_price);
+        }
+        
+        // Date range filter
+        if ($request->has('start_date') && $request->start_date) {
+            $query->where('start_date', '>=', $request->start_date);
+        }
+        
+        if ($request->has('end_date') && $request->end_date) {
+            $query->where('end_date', '<=', $request->end_date);
+        }
+        
+        // Location filter
+        if ($request->has('location') && $request->location) {
+            $query->where('location', 'like', "%{$request->location}%");
+        }
+        
+        // Available tickets filter
+        if ($request->has('available_only') && $request->available_only === 'true') {
+            $query->where('available_tickets', '>', 0);
+        }
+        
+        // Featured filter
+        if ($request->has('featured') && $request->featured === 'true') {
+            $query->where('featured', true);
+        }
+        
+        // Active events only
+        if ($request->has('active_only') && $request->active_only === 'true') {
+            $query->where('end_date', '>', now());
+        }
+        
+        // Sorting
+        $sortBy = $request->get('sort_by', 'start_date');
+        $sortOrder = $request->get('sort_order', 'asc');
+        
+        $allowedSortFields = ['start_date', 'price', 'name', 'created_at', 'available_tickets'];
+        if (in_array($sortBy, $allowedSortFields)) {
+            $query->orderBy($sortBy, $sortOrder);
+        }
+        
+        // Pagination
+        $perPage = $request->get('per_page', 6);
+        $perPage = min($perPage, 50); // Limit max per page
+        
+        $events = $query->paginate($perPage);
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'Events retrieved successfully',
+            'data' => [
+                'data' => EventResource::collection($events->items()),
+                'current_page' => $events->currentPage(),
+                'last_page' => $events->lastPage(),
+                'per_page' => $events->perPage(),
+                'total' => $events->total(),
+                'from' => $events->firstItem(),
+                'to' => $events->lastItem(),
+                'has_more_pages' => $events->hasMorePages(),
+            ]
+        ]);
+    }
+
+    /**
+     * @OA\Get(
+     * path="/api/events/suggestions",
+     * summary="Get search suggestions based on a search term",
+     * tags={"Events"},
+     * @OA\Parameter(
+     * name="term",
+     * in="query",
+     * required=true,
+     * description="The search term to get suggestions for",
+     * @OA\Schema(type="string")
+     * ),
+     * @OA\Response(
+     * response=200,
+     * description="Suggestions retrieved successfully",
+     * @OA\JsonContent(
+     * @OA\Property(property="success", type="boolean", example=true),
+     * @OA\Property(property="data", type="array",
+     * @OA\Items(
+     * @OA\Property(property="type", type="string", example="event"),
+     * @OA\Property(property="value", type="string", example="Concert in the Park"),
+     * @OA\Property(property="label", type="string", example="Concert in the Park")
+     * )
+     * )
+     * )
+     * )
      * )
      */
-    // Update the index method in EventController
-public function index(Request $request): JsonResponse
-{
-    $query = Event::with('category');
-    
-    // Search functionality
-    if ($request->has('search') && $request->search) {
-        $searchTerm = $request->search;
-        $query->where(function($q) use ($searchTerm) {
-            $q->where('name', 'like', "%{$searchTerm}%")
-              ->orWhere('description', 'like', "%{$searchTerm}%")
-              ->orWhere('location', 'like', "%{$searchTerm}%");
-        });
+    public function searchSuggestions(Request $request): JsonResponse
+    {
+        $term = $request->get('term', '');
+        
+        if (strlen($term) < 2) {
+            return response()->json([
+                'success' => true,
+                'data' => []
+            ]);
+        }
+        
+        $suggestions = [];
+        
+        // Event names
+        $eventNames = Event::where('name', 'like', "%{$term}%")
+            ->select('name')
+            ->distinct()
+            ->limit(5)
+            ->pluck('name');
+        
+        foreach ($eventNames as $name) {
+            $suggestions[] = [
+                'type' => 'event',
+                'value' => $name,
+                'label' => $name
+            ];
+        }
+        
+        // Locations
+        $locations = Event::where('location', 'like', "%{$term}%")
+            ->select('location')
+            ->distinct()
+            ->limit(3)
+            ->pluck('location');
+        
+        foreach ($locations as $location) {
+            $suggestions[] = [
+                'type' => 'location',
+                'value' => $location,
+                'label' => "📍 {$location}"
+            ];
+        }
+        
+        // Categories
+        $categories = Category::where('name', 'like', "%{$term}%")
+            ->select('name')
+            ->limit(3)
+            ->pluck('name');
+        
+        foreach ($categories as $category) {
+            $suggestions[] = [
+                'type' => 'category',
+                'value' => $category,
+                'label' => "🏷️ {$category}"
+            ];
+        }
+        
+        return response()->json([
+            'success' => true,
+            'data' => array_slice($suggestions, 0, 10)
+        ]);
     }
-    
-    // Category filter
-    if ($request->has('category_id') && $request->category_id) {
-        $query->where('category_id', $request->category_id);
-    }
-    
-    // Available tickets filter
-    if ($request->has('available_only') && $request->available_only === 'true') {
-        $query->where('available_tickets', '>', 0);
-    }
-    
-    // Featured filter
-    if ($request->has('featured') && $request->featured === 'true') {
-        $query->where('featured', true);
-    }
-    
-    // Sorting
-    $sortBy = $request->get('sort_by', 'start_date');
-    $sortOrder = $request->get('sort_order', 'asc');
-    
-    $allowedSortFields = ['start_date', 'price', 'name', 'created_at'];
-    if (in_array($sortBy, $allowedSortFields)) {
-        $query->orderBy($sortBy, $sortOrder);
-    }
-    
-    // Pagination
-    $perPage = $request->get('per_page', 6);
-    $perPage = min($perPage, 50); // Limit max per page
-    
-    $events = $query->paginate($perPage);
-    
-    return response()->json([
-        'success' => true,
-        'message' => 'Events retrieved successfully',
-        'data' => [
-            'data' => EventResource::collection($events->items()),
-            'current_page' => $events->currentPage(),
-            'last_page' => $events->lastPage(),
-            'per_page' => $events->perPage(),
-            'total' => $events->total(),
-            'from' => $events->firstItem(),
-            'to' => $events->lastItem(),
-            'has_more_pages' => $events->hasMorePages(),
-        ]
-    ]);
-}
+
 
 
  /**

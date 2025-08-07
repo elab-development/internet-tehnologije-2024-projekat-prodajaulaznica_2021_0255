@@ -230,6 +230,13 @@ export const apiService = {
   validateTicket: async (ticketNumber) => {
     return await api.get(`/tickets/validate/${ticketNumber}`);
   },
+
+  // Search suggestions
+  getSearchSuggestions: async (term) => {
+    return await api.get(
+      `/events/search/suggestions?term=${encodeURIComponent(term)}`
+    );
+  },
 };
 
 export default apiService;

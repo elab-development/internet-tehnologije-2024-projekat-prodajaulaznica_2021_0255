@@ -24,6 +24,7 @@ Route::get('events', [EventController::class, 'index']);
 Route::get('events/{id}', [EventController::class, 'show']);
 Route::get('events/category/{categoryId}', [EventController::class, 'getEventsByCategory']);
 Route::get('events/{id}/tickets', [EventController::class, 'getEventTickets']);
+Route::get('events/search/suggestions', [EventController::class, 'searchSuggestions']);
 
 // Public access to categories
 Route::get('categories', [CategoryController::class, 'index']);

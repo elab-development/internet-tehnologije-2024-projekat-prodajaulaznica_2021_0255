@@ -328,6 +328,21 @@ export const apiService = {
   validateQRCode: async (qrData) => {
     return await api.post("/tickets/validate-qr", { qr_data: qrData });
   },
+
+  // Ticket validation interface
+  getEventValidationStats: async (eventId) => {
+    return await api.get(`/events/${eventId}/validation-stats`);
+  },
+
+  validateBulkTickets: async (ticketNumbers) => {
+    return await api.post("/tickets/validate/bulk", {
+      ticket_numbers: ticketNumbers,
+    });
+  },
+
+  markTicketAsUsed: async (ticketId) => {
+    return await api.patch(`/tickets/${ticketId}/use`);
+  },
 };
 
 export default apiService;

@@ -66,16 +66,28 @@ const Header = () => {
           </Link>
 
           {isAdmin() && (
-            <Link
-              to="/admin/events"
-              style={{
-                textDecoration: "none",
-                color: "#e74c3c",
-                fontWeight: "bold",
-              }}
-            >
-              Admin
-            </Link>
+            <div style={{ display: "flex", gap: "1rem" }}>
+              <Link
+                to="/admin/events"
+                style={{
+                  textDecoration: "none",
+                  color: "#e74c3c",
+                  fontWeight: "bold",
+                }}
+              >
+                Admin
+              </Link>
+              <Link
+                to="/admin/validation"
+                style={{
+                  textDecoration: "none",
+                  color: "#e74c3c",
+                  fontWeight: "bold",
+                }}
+              >
+                Validacija
+              </Link>
+            </div>
           )}
 
           <AuthStatus />

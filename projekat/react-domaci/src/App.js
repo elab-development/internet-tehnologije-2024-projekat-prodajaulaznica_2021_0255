@@ -17,6 +17,7 @@ import CategoryDetailsPage from "./pages/CategoryDetailsPage/CategoryDetailsPage
 import AdminRoute from "./components/common/AdminRoute/AdminRoute";
 import AdminEventsPage from "./pages/AdminEventsPage/AdminEventsPage";
 import TicketsPage from "./pages/TicketsPage/TicketsPage";
+import ValidationPage from "./pages/ValidationPage/ValidationPage";
 
 import "./App.css";
 
@@ -96,6 +97,14 @@ function App() {
                   element={
                     <AdminRoute>
                       <AdminEventsPage />
+                    </AdminRoute>
+                  }
+                />
+                <Route
+                  path="/admin/validation"
+                  element={
+                    <AdminRoute>
+                      <ValidationPage />
                     </AdminRoute>
                   }
                 />

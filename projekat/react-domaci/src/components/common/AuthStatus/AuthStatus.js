@@ -1,9 +1,10 @@
 import React from "react";
 import { useAuth } from "../../../context/AuthContext";
 import Button from "../Button";
+import LogoutButton from "../LogoutButton";
 
 const AuthStatus = () => {
-  const { user, isAuthenticated, logout, loading } = useAuth();
+  const { user, isAuthenticated, loading } = useAuth();
 
   if (loading) {
     return <div>Loading...</div>;
@@ -39,9 +40,7 @@ const AuthStatus = () => {
       >
         Profil
       </Button>
-      <Button variant="outline" size="small" onClick={logout}>
-        Odjava
-      </Button>
+      <LogoutButton />
     </div>
   );
 };

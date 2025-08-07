@@ -116,14 +116,26 @@ export const AuthProvider = ({ children }) => {
       setLoading(true);
 
       if (token) {
+        // Call Laravel logout endpoint
         await apiService.logout();
       }
     } catch (error) {
       console.error("Logout error:", error);
+      // Continue with logout even if API call fails
     } finally {
+      // Clear all auth data
       clearAuthData();
       setLoading(false);
+
+      // Redirect to home page
+      window.location.href = "/";
     }
+  };
+
+  // Forced logout (when token expires)
+  const forceLogout = () => {
+    clearAuthData();
+    window.location.href = "/login";
   };
 
   const updateUser = (userData) => {

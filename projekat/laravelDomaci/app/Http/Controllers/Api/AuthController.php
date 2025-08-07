@@ -109,14 +109,21 @@ class AuthController extends Controller
      *     @OA\Response(response=200, description="Logged out successfully")
      * )
      */
-    public function logout(Request $request)
-    {
+public function logout(Request $request)
+{
+    try {
+        // Delete current access token
         $request->user()->currentAccessToken()->delete();
-
+        
         return response()->json([
             'message' => 'Logged out successfully'
         ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'message' => 'Logout failed'
+        ], 500);
     }
+}
 
     /**
      * @OA\Get(

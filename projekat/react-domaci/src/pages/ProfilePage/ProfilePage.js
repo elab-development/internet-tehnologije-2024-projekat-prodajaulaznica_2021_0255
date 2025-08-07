@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from "react";
 import Button from "../../components/common/Button";
 import "./ProfilePage.css";
+import { useAuth } from "../../context/AuthContext";
+import LogoutButton from "../../components/common/LogoutButton";
 
 const ProfilePage = () => {
+  const { user } = useAuth();
   const [weatherData, setWeatherData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -95,6 +98,12 @@ const ProfilePage = () => {
               <span className="location-icon">📍</span>
               <span>Beograd</span>
             </div>
+            <div className="profile-actions">
+              <LogoutButton variant="danger" size="medium">
+                Odjavi se
+              </LogoutButton>
+            </div>
+
             <div className="profile-stats">
               <div className="stat">
                 <span className="stat-number">24</span>

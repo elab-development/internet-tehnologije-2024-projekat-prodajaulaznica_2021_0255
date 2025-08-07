@@ -60,6 +60,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('tickets/{id}/cancel', [TicketController::class, 'cancel']);
     Route::patch('tickets/{id}/use', [TicketController::class, 'markAsUsed']);
     Route::get('events/{eventId}/validation-stats', [TicketController::class, 'getValidationStats']);
+    // Enhanced ticket management
+    Route::get('tickets/stats', [TicketController::class, 'getTicketStats']);
+    Route::get('tickets/{id}/download', [TicketController::class, 'downloadTicket']);
+
 
 });
 

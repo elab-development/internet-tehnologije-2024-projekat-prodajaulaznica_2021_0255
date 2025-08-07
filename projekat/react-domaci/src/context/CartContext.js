@@ -1,4 +1,10 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useRef,
+} from "react";
 import { useAuth } from "./AuthContext";
 import useLocalStorage from "../hooks/useLocalStorage";
 
@@ -12,12 +18,20 @@ export const CartProvider = ({ children }) => {
   );
   const [isProcessing, setIsProcessing] = useState(false);
 
+  // Track previous authentication state to avoid unnecessary calls
+  const prevAuthState = useRef();
+
   // Clear cart when user logs out
   useEffect(() => {
-    if (!isAuthenticated()) {
+    const currentAuthState = isAuthenticated();
+
+    // Only clear cart if user was previously authenticated and now is not
+    if (prevAuthState.current === true && currentAuthState === false) {
       removeCartItems();
     }
-  }, [isAuthenticated, removeCartItems]);
+
+    prevAuthState.current = currentAuthState;
+  }, [isAuthenticated]); // ✅ Remove removeCartItems from dependencies
 
   // Add item to cart
   const addToCart = (item) => {

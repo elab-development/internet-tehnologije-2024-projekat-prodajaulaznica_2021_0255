@@ -8,13 +8,12 @@ import "./Header.css";
 const Header = () => {
   // Use a constant for the app title to avoid repeating the string
   const APP_TITLE = "🎫 TicketMaster Pro";
-
   // Use the useContext hook to get cart items
   const { cartItems } = useContext(CartContext);
   // Use the useLocation hook to determine the current path for active links
   const location = useLocation();
-  // Use the useAuth hook to get the isAdmin function for conditional rendering
-  const { isAdmin } = useAuth();
+  // Use the useAuth hook to get the isAdmin and isAuthenticated functions
+  const { isAdmin, isAuthenticated } = useAuth();
 
   // Calculate the total number of items in the cart
   const cartItemsCount = cartItems.reduce(
@@ -36,35 +35,51 @@ const Header = () => {
         </Link>
 
         {/* Navigation links */}
-        <nav className="navigation">
-          <Link to="/" className={isActive("/")}>
+        <nav style={{ display: "flex", gap: "2rem", alignItems: "center" }}>
+          <Link to="/" style={{ textDecoration: "none", color: "#333" }}>
             Početna
           </Link>
-          <Link to="/events" className={isActive("/events")}>
+          <Link to="/events" style={{ textDecoration: "none", color: "#333" }}>
             Događaji
           </Link>
-          <Link to="/profile" className={isActive("/profile")}>
-            Profil
+          <Link
+            to="/categories"
+            style={{ textDecoration: "none", color: "#333" }}
+          >
+            Kategorije
           </Link>
-          {/* Conditionally render the admin link only if the user is an admin */}
-          {isAdmin() && (
-            <Link to="/admin/events" className={isActive("/admin/events")}>
-              Admin
+
+          {isAuthenticated() && (
+            <Link
+              to="/tickets"
+              style={{ textDecoration: "none", color: "#333" }}
+            >
+              Moje karte
             </Link>
           )}
-        </nav>
 
-        {/* Header actions: Cart and Auth Status */}
-        <div className="header-actions">
-          <Link to="/cart" className="cart-link">
-            🛒 Korpa{" "}
+          <Link to="/cart" style={{ textDecoration: "none", color: "#333" }}>
+            Korpa{" "}
             {cartItemsCount > 0 && (
               <span className="cart-count">{cartItemsCount}</span>
             )}
           </Link>
-          {/* AuthStatus component handles the login/logout display */}
+
+          {isAdmin() && (
+            <Link
+              to="/admin/events"
+              style={{
+                textDecoration: "none",
+                color: "#e74c3c",
+                fontWeight: "bold",
+              }}
+            >
+              Admin
+            </Link>
+          )}
+
           <AuthStatus />
-        </div>
+        </nav>
       </div>
     </header>
   );

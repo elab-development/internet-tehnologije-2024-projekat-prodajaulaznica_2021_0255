@@ -215,8 +215,29 @@ export const apiService = {
     return await api.post("/tickets/purchase", ticketData);
   },
 
-  getMyTickets: async () => {
-    return await api.get("/tickets/my");
+  // Enhanced ticket management with filters support
+  getMyTickets: async (filters = {}) => {
+    const params = new URLSearchParams();
+
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value && value !== "all") {
+        params.append(key, value);
+      }
+    });
+
+    return await api.get(`/tickets/my?${params.toString()}`);
+  },
+
+  // New ticket statistics endpoint
+  getTicketStats: async () => {
+    return await api.get("/tickets/stats");
+  },
+
+  // New ticket download functionality
+  downloadTicket: async (ticketId) => {
+    return await api.get(`/tickets/${ticketId}/download`, {
+      responseType: "blob",
+    });
   },
 
   getTicketById: async (id) => {

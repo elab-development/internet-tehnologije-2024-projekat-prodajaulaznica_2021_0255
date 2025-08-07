@@ -28,7 +28,7 @@ class TicketController extends Controller
      *         @OA\JsonContent(
      *             required={"event_id"},
      *             @OA\Property(property="event_id", type="integer", example=1, description="ID of the event"),
-     *             @OA\Property(property="discount_percentage", type="number", format="float", minimum=0, maximum=100, example=10, nullable=true)
+     *             @OA\Property(property="discount_percentage", type="number", format="float", minimum=0, maximum=100, example=10, nullable=true, description="Optional discount percentage to apply")
      *         )
      *     ),
      *     
@@ -38,7 +38,7 @@ class TicketController extends Controller
      *         @OA\JsonContent(
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="Ticket purchased successfully"),
-     *             @OA\Property(property="data", type="object", description="Ticket resource returned")
+     *             @OA\Property(property="data", ref="#/components/schemas/TicketResource")
      *         )
      *     ),
      *     
@@ -138,39 +138,301 @@ class TicketController extends Controller
     /**
      * @OA\Get(
      *     path="/api/tickets/my",
-     *     summary="Get tickets for the authenticated user",
+     *     summary="Get tickets for the authenticated user with filtering and pagination",
+     *     description="Retrieves paginated list of user's tickets with optional filtering by status, search, and sorting capabilities",
+     *     operationId="myTickets",
      *     tags={"Tickets"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Response(response=200, description="List of user's tickets")
+     *     security={{"sanctum":{}}},
+     *     
+     *     @OA\Parameter(
+     *         name="status",
+     *         in="query",
+     *         description="Filter by ticket status",
+     *         required=false,
+     *         @OA\Schema(type="string", enum={"active", "used", "cancelled", "all"}, default="all")
+     *     ),
+     *     @OA\Parameter(
+     *         name="search",
+     *         in="query",
+     *         description="Search in event name or location",
+     *         required=false,
+     *         @OA\Schema(type="string")
+     *     ),
+     *     @OA\Parameter(
+     *         name="sortBy",
+     *         in="query",
+     *         description="Sort by field",
+     *         required=false,
+     *         @OA\Schema(type="string", enum={"purchase_date", "event_date", "price", "status"}, default="purchase_date")
+     *     ),
+     *     @OA\Parameter(
+     *         name="sortOrder",
+     *         in="query",
+     *         description="Sort order",
+     *         required=false,
+     *         @OA\Schema(type="string", enum={"asc", "desc"}, default="desc")
+     *     ),
+     *     @OA\Parameter(
+     *         name="per_page",
+     *         in="query",
+     *         description="Items per page",
+     *         required=false,
+     *         @OA\Schema(type="integer", minimum=1, maximum=100, default=10)
+     *     ),
+     *     @OA\Parameter(
+     *         name="page",
+     *         in="query",
+     *         description="Page number",
+     *         required=false,
+     *         @OA\Schema(type="integer", minimum=1, default=1)
+     *     ),
+     *     
+     *     @OA\Response(
+     *         response=200,
+     *         description="User tickets retrieved successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="User tickets retrieved successfully"),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="tickets", type="array", @OA\Items(ref="#/components/schemas/TicketResource")),
+     *                 @OA\Property(property="pagination", type="object",
+     *                     @OA\Property(property="current_page", type="integer", example=1),
+     *                     @OA\Property(property="last_page", type="integer", example=5),
+     *                     @OA\Property(property="per_page", type="integer", example=10),
+     *                     @OA\Property(property="total", type="integer", example=45)
+     *                 ),
+     *                 @OA\Property(property="stats", type="object",
+     *                     @OA\Property(property="total", type="integer", example=45),
+     *                     @OA\Property(property="active", type="integer", example=12),
+     *                     @OA\Property(property="used", type="integer", example=30),
+     *                     @OA\Property(property="cancelled", type="integer", example=3),
+     *                     @OA\Property(property="total_spent", type="number", format="float", example=1250.75),
+     *                     @OA\Property(property="upcoming_events", type="integer", example=5)
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     
+     *     @OA\Response(
+     *         response=500,
+     *         description="Server error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Error retrieving tickets"),
+     *             @OA\Property(property="data", type="null")
+     *         )
+     *     )
      * )
      */
     public function myTickets(Request $request): JsonResponse
     {
-        $tickets = Ticket::where('user_id', $request->user()->id)
-            ->with(['event.category'])
-            ->orderBy('purchase_date', 'desc')
-            ->get();
+        try {
+            $query = Ticket::with(['event.category'])
+                ->where('user_id', auth()->id());
 
-        return response()->json([
-            'tickets' => $tickets
-        ]);
+            // Apply filters
+            if ($request->has('status') && $request->status !== 'all') {
+                $query->where('status', $request->status);
+            }
+
+            if ($request->has('search') && $request->search) {
+                $searchTerm = $request->search;
+                $query->whereHas('event', function($q) use ($searchTerm) {
+                    $q->where('name', 'like', "%{$searchTerm}%")
+                      ->orWhere('location', 'like', "%{$searchTerm}%");
+                });
+            }
+
+            // Apply sorting
+            $sortBy = $request->get('sortBy', 'purchase_date');
+            $sortOrder = $request->get('sortOrder', 'desc');
+
+            switch ($sortBy) {
+                case 'event_date':
+                    $query->join('events', 'tickets.event_id', '=', 'events.id')
+                          ->orderBy('events.start_date', $sortOrder)
+                          ->select('tickets.*');
+                    break;
+                case 'price':
+                    $query->orderBy('price', $sortOrder);
+                    break;
+                case 'status':
+                    $query->orderBy('status', $sortOrder);
+                    break;
+                default:
+                    $query->orderBy('purchase_date', $sortOrder);
+            }
+
+            // Pagination
+            $perPage = $request->get('per_page', 10);
+            $tickets = $query->paginate($perPage);
+
+            // Get user ticket statistics
+            $stats = $this->getUserTicketStats(auth()->id());
+
+            return response()->json([
+                'success' => true,
+                'message' => 'User tickets retrieved successfully',
+                'data' => [
+                    'tickets' => TicketResource::collection($tickets->items()),
+                    'pagination' => [
+                        'current_page' => $tickets->currentPage(),
+                        'last_page' => $tickets->lastPage(),
+                        'per_page' => $tickets->perPage(),
+                        'total' => $tickets->total(),
+                    ],
+                    'stats' => $stats
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error retrieving tickets',
+                'data' => null
+            ], 500);
+        }
+    }
+
+    /**
+     * Add method for user ticket statistics
+     */
+    private function getUserTicketStats($userId): array
+    {
+        $tickets = Ticket::where('user_id', $userId);
+        
+        return [
+            'total' => $tickets->count(),
+            'active' => $tickets->where('status', 'active')->count(),
+            'used' => $tickets->where('status', 'used')->count(),
+            'cancelled' => $tickets->where('status', 'cancelled')->count(),
+            'total_spent' => $tickets->sum('price'),
+            'upcoming_events' => $tickets->where('status', 'active')
+                ->whereHas('event', function($q) {
+                    $q->where('start_date', '>', now());
+                })->count()
+        ];
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/tickets/stats",
+     *     summary="Get general ticket statistics for authenticated user",
+     *     description="Retrieves comprehensive ticket statistics including recent tickets and upcoming events",
+     *     operationId="getTicketStats",
+     *     tags={"Tickets"},
+     *     security={{"sanctum":{}}},
+     *     
+     *     @OA\Response(
+     *         response=200,
+     *         description="Ticket statistics retrieved successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Ticket statistics retrieved successfully"),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="stats", type="object",
+     *                     @OA\Property(property="total", type="integer", example=45),
+     *                     @OA\Property(property="active", type="integer", example=12),
+     *                     @OA\Property(property="used", type="integer", example=30),
+     *                     @OA\Property(property="cancelled", type="integer", example=3),
+     *                     @OA\Property(property="total_spent", type="number", format="float", example=1250.75),
+     *                     @OA\Property(property="upcoming_events", type="integer", example=5)
+     *                 ),
+     *                 @OA\Property(property="recent_tickets", type="array", @OA\Items(ref="#/components/schemas/TicketResource")),
+     *                 @OA\Property(property="upcoming_events", type="array", @OA\Items(ref="#/components/schemas/TicketResource"))
+     *             )
+     *         )
+     *     ),
+     *     
+     *     @OA\Response(
+     *         response=500,
+     *         description="Server error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Error retrieving ticket statistics"),
+     *             @OA\Property(property="data", type="null")
+     *         )
+     *     )
+     * )
+     */
+    public function getTicketStats(): JsonResponse
+    {
+        try {
+            $userId = auth()->id();
+            $stats = $this->getUserTicketStats($userId);
+            
+            // Add additional stats
+            $recentTickets = Ticket::with('event')
+                ->where('user_id', $userId)
+                ->orderBy('purchase_date', 'desc')
+                ->limit(5)
+                ->get();
+
+            $upcomingEvents = Ticket::with('event')
+                ->where('user_id', $userId)
+                ->where('status', 'active')
+                ->whereHas('event', function($q) {
+                    $q->where('start_date', '>', now())
+                      ->where('start_date', '<=', now()->addDays(30));
+                })
+                ->orderBy('purchase_date', 'desc')
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Ticket statistics retrieved successfully',
+                'data' => [
+                    'stats' => $stats,
+                    'recent_tickets' => TicketResource::collection($recentTickets),
+                    'upcoming_events' => TicketResource::collection($upcomingEvents)
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error retrieving ticket statistics',
+                'data' => null
+            ], 500);
+        }
     }
 
     /**
      * @OA\Get(
      *     path="/api/tickets/{id}",
      *     summary="Get a single ticket by ID",
+     *     description="Retrieves detailed information about a specific ticket owned by the authenticated user",
+     *     operationId="showTicket",
      *     tags={"Tickets"},
-     *     security={{"bearerAuth":{}}},
+     *     security={{"sanctum":{}}},
+     *     
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
      *         required=true,
-     *         @OA\Schema(type="integer")
+     *         description="Ticket ID",
+     *         @OA\Schema(type="integer", example=1)
      *     ),
-     *     @OA\Response(response=200, description="Ticket details"),
-     *     @OA\Response(response=403, description="Unauthorized access"),
-     *     @OA\Response(response=404, description="Ticket not found")
+     *     
+     *     @OA\Response(
+     *         response=200,
+     *         description="Ticket details retrieved successfully",
+     *         @OA\JsonContent(ref="#/components/schemas/TicketResource")
+     *     ),
+     *     @OA\Response(
+     *         response=403,
+     *         description="Unauthorized access to ticket",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Unauthorized access to ticket")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Ticket not found",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Ticket not found")
+     *         )
+     *     )
      * )
      */
     public function show($id): JsonResponse
@@ -188,19 +450,137 @@ class TicketController extends Controller
     }
 
     /**
-     * @OA\Put(
-     *     path="/api/tickets/{id}/cancel",
-     *     summary="Cancel a ticket",
+     * @OA\Get(
+     *     path="/api/tickets/{id}/download",
+     *     summary="Download ticket data",
+     *     description="Retrieves ticket data formatted for download/printing purposes",
+     *     operationId="downloadTicket",
      *     tags={"Tickets"},
-     *     security={{"bearerAuth":{}}},
+     *     security={{"sanctum":{}}},
+     *     
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
      *         required=true,
-     *         @OA\Schema(type="integer")
+     *         description="Ticket ID",
+     *         @OA\Schema(type="integer", example=1)
      *     ),
-     *     @OA\Response(response=200, description="Ticket cancelled"),
-     *     @OA\Response(response=422, description="Cannot cancel ticket")
+     *     
+     *     @OA\Response(
+     *         response=200,
+     *         description="Ticket data retrieved for download",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Ticket data retrieved for download"),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="ticket_number", type="string", example="TKT-ABC12345"),
+     *                 @OA\Property(property="qr_code", type="string", example="550e8400-e29b-41d4-a716-446655440000"),
+     *                 @OA\Property(property="event", type="object",
+     *                     @OA\Property(property="name", type="string", example="Summer Music Festival"),
+     *                     @OA\Property(property="start_date", type="string", format="date-time"),
+     *                     @OA\Property(property="location", type="string", example="Central Park"),
+     *                     @OA\Property(property="category", type="string", example="Music")
+     *                 ),
+     *                 @OA\Property(property="user", type="object",
+     *                     @OA\Property(property="name", type="string", example="John Doe"),
+     *                     @OA\Property(property="email", type="string", example="john@example.com")
+     *                 ),
+     *                 @OA\Property(property="price", type="number", format="float", example=75.50),
+     *                 @OA\Property(property="status", type="string", example="active"),
+     *                 @OA\Property(property="purchase_date", type="string", format="date-time")
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Ticket not found",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Ticket not found"),
+     *             @OA\Property(property="data", type="null")
+     *         )
+     *     )
+     * )
+     */
+    public function downloadTicket($id): JsonResponse
+    {
+        try {
+            $ticket = Ticket::with(['event.category', 'user'])
+                ->where('user_id', auth()->id())
+                ->findOrFail($id);
+
+            // Generate ticket data for download
+            $ticketData = [
+                'ticket_number' => $ticket->ticket_number,
+                'qr_code' => $ticket->qr_code,
+                'event' => [
+                    'name' => $ticket->event->name,
+                    'start_date' => $ticket->event->start_date,
+                    'location' => $ticket->event->location,
+                    'category' => $ticket->event->category->name,
+                ],
+                'user' => [
+                    'name' => $ticket->user->name,
+                    'email' => $ticket->user->email,
+                ],
+                'price' => $ticket->price,
+                'status' => $ticket->status,
+                'purchase_date' => $ticket->purchase_date,
+            ];
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Ticket data retrieved for download',
+                'data' => $ticketData
+            ]);
+
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Ticket not found',
+                'data' => null
+            ], 404);
+        }
+    }
+
+    /**
+     * @OA\Put(
+     *     path="/api/tickets/{id}/cancel",
+     *     summary="Cancel a ticket",
+     *     description="Cancels a user's ticket if eligible. Tickets cannot be cancelled after the event has started or if already used/cancelled.",
+     *     operationId="cancelTicket",
+     *     tags={"Tickets"},
+     *     security={{"sanctum":{}}},
+     *     
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="Ticket ID",
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
+     *     
+     *     @OA\Response(
+     *         response=200,
+     *         description="Ticket cancelled successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Ticket cancelled successfully")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Cannot cancel ticket",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Cannot cancel ticket for events that have already started")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Ticket not found",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Ticket not found")
+     *         )
+     *     )
      * )
      */
     public function cancel($id): JsonResponse
@@ -240,16 +620,54 @@ class TicketController extends Controller
      * @OA\Get(
      *     path="/api/tickets/validate/{ticketNumber}",
      *     summary="Validate a ticket by ticket number",
+     *     description="Validates a ticket using its ticket number and returns detailed validation status",
+     *     operationId="validateTicket",
      *     tags={"Tickets"},
+     *     
      *     @OA\Parameter(
      *         name="ticketNumber",
      *         in="path",
      *         required=true,
-     *         @OA\Schema(type="string")
+     *         description="Ticket number (e.g., TKT-ABC12345)",
+     *         @OA\Schema(type="string", example="TKT-ABC12345")
      *     ),
-     *     @OA\Response(response=200, description="Ticket validation result"),
-     *     @OA\Response(response=404, description="Invalid ticket number"),
-     *     @OA\Response(response=500, description="Validation error")
+     *     
+     *     @OA\Response(
+     *         response=200,
+     *         description="Ticket validation completed",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Valid ticket"),
+     *             @OA\Property(property="valid", type="boolean", example=true),
+     *             @OA\Property(property="data", ref="#/components/schemas/TicketResource"),
+     *             @OA\Property(property="validation_details", type="object",
+     *                 @OA\Property(property="ticket_status", type="string", example="active"),
+     *                 @OA\Property(property="event_status", type="string", example="active"),
+     *                 @OA\Property(property="validation_time", type="string", format="date-time"),
+     *                 @OA\Property(property="reason", type="string", example="valid")
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Invalid ticket number",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Invalid ticket number"),
+     *             @OA\Property(property="valid", type="boolean", example=false),
+     *             @OA\Property(property="data", type="null")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Validation error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Error validating ticket"),
+     *             @OA\Property(property="valid", type="boolean", example=false),
+     *             @OA\Property(property="data", type="null")
+     *         )
+     *     )
      * )
      */
     public function validateTicket($ticketNumber): JsonResponse
@@ -365,8 +783,11 @@ class TicketController extends Controller
      * @OA\Post(
      *     path="/api/tickets/validate/bulk",
      *     summary="Bulk ticket validation for entry scanning",
+     *     description="Validates multiple tickets at once for efficient entry processing. Limited to 50 tickets per request.",
+     *     operationId="validateBulk",
      *     tags={"Tickets"},
-     *     security={{"bearerAuth":{}}},
+     *     security={{"sanctum":{}}},
+     *     
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(
@@ -375,11 +796,42 @@ class TicketController extends Controller
      *                 property="ticket_numbers",
      *                 type="array",
      *                 maxItems=50,
-     *                 @OA\Items(type="string")
+     *                 description="Array of ticket numbers to validate",
+     *                 @OA\Items(type="string", example="TKT-ABC12345")
      *             )
      *         )
      *     ),
-     *     @OA\Response(response=200, description="Bulk validation results")
+     *     
+     *     @OA\Response(
+     *         response=200,
+     *         description="Bulk validation completed",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Bulk validation completed"),
+     *             @OA\Property(property="data", type="array",
+     *                 @OA\Items(type="object",
+     *                     @OA\Property(property="ticket_number", type="string", example="TKT-ABC12345"),
+     *                     @OA\Property(property="valid", type="boolean", example=true),
+     *                     @OA\Property(property="message", type="string", example="Valid ticket"),
+     *                     @OA\Property(property="ticket", ref="#/components/schemas/TicketResource")
+     *                 )
+     *             ),
+     *             @OA\Property(property="summary", type="object",
+     *                 @OA\Property(property="total", type="integer", example=10),
+     *                 @OA\Property(property="valid", type="integer", example=8),
+     *                 @OA\Property(property="invalid", type="integer", example=2)
+     *             )
+     *         )
+     *     ),
+     *     
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validation error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="The ticket numbers field is required."),
+     *             @OA\Property(property="errors", type="object")
+     *         )
+     *     )
      * )
      */
     public function validateBulk(Request $request): JsonResponse
@@ -430,18 +882,58 @@ class TicketController extends Controller
      * @OA\Put(
      *     path="/api/tickets/{id}/mark-used",
      *     summary="Mark a ticket as used (for entry)",
+     *     description="Marks a ticket as used when a person enters an event. Validates the ticket before marking as used.",
+     *     operationId="markAsUsed",
      *     tags={"Tickets"},
-     *     security={{"bearerAuth":{}}},
+     *     security={{"sanctum":{}}},
+     *     
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
      *         required=true,
-     *         @OA\Schema(type="integer")
+     *         description="Ticket ID",
+     *         @OA\Schema(type="integer", example=1)
      *     ),
-     *     @OA\Response(response=200, description="Ticket marked as used"),
-     *     @OA\Response(response=404, description="Ticket not found"),
-     *     @OA\Response(response=422, description="Ticket not valid for use"),
-     *     @OA\Response(response=500, description="Server error")
+     *     
+     *     @OA\Response(
+     *         response=200,
+     *         description="Ticket marked as used successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Ticket marked as used successfully"),
+     *             @OA\Property(property="data", ref="#/components/schemas/TicketResource")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Ticket not found",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Ticket not found"),
+     *             @OA\Property(property="data", type="null")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Ticket not valid for use",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Ticket has already been used"),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="used_at", type="string", format="date-time"),
+     *                 @OA\Property(property="ticket", ref="#/components/schemas/TicketResource")
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Server error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Error marking ticket as used"),
+     *             @OA\Property(property="data", type="null")
+     *         )
+     *     )
      * )
      */
     public function markAsUsed($id): JsonResponse
@@ -513,16 +1005,51 @@ class TicketController extends Controller
      * @OA\Get(
      *     path="/api/events/{eventId}/validation-stats",
      *     summary="Get ticket validation statistics for an event",
+     *     description="Retrieves comprehensive validation and usage statistics for a specific event",
+     *     operationId="getValidationStats",
      *     tags={"Tickets"},
-     *     security={{"bearerAuth":{}}},
+     *     security={{"sanctum":{}}},
+     *     
      *     @OA\Parameter(
      *         name="eventId",
      *         in="path",
      *         required=true,
-     *         @OA\Schema(type="integer")
+     *         description="Event ID",
+     *         @OA\Schema(type="integer", example=1)
      *     ),
-     *     @OA\Response(response=200, description="Validation statistics"),
-     *     @OA\Response(response=404, description="Event not found")
+     *     
+     *     @OA\Response(
+     *         response=200,
+     *         description="Validation statistics retrieved successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Validation statistics retrieved successfully"),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="total_tickets", type="integer", example=150),
+     *                 @OA\Property(property="active_tickets", type="integer", example=120),
+     *                 @OA\Property(property="used_tickets", type="integer", example=85),
+     *                 @OA\Property(property="cancelled_tickets", type="integer", example=30),
+     *                 @OA\Property(property="validation_rate", type="number", format="float", example=56.67),
+     *                 @OA\Property(property="recent_validations", type="array",
+     *                     @OA\Items(type="object",
+     *                         @OA\Property(property="ticket_number", type="string", example="TKT-ABC12345"),
+     *                         @OA\Property(property="user_name", type="string", example="John Doe"),
+     *                         @OA\Property(property="used_at", type="string", format="date-time"),
+     *                         @OA\Property(property="time_ago", type="string", example="5 minutes ago")
+     *                     )
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Event not found",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Event not found"),
+     *             @OA\Property(property="data", type="null")
+     *         )
+     *     )
      * )
      */
     public function getValidationStats($eventId): JsonResponse

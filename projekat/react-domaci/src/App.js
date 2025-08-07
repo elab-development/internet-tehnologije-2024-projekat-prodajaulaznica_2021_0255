@@ -16,6 +16,8 @@ import CategoriesPage from "./pages/CategoriesPage/CategoriesPage";
 import CategoryDetailsPage from "./pages/CategoryDetailsPage/CategoryDetailsPage";
 import AdminRoute from "./components/common/AdminRoute/AdminRoute";
 import AdminEventsPage from "./pages/AdminEventsPage/AdminEventsPage";
+import TicketsPage from "./pages/TicketsPage/TicketsPage";
+
 import "./App.css";
 
 function App() {
@@ -97,6 +99,7 @@ function App() {
                     </AdminRoute>
                   }
                 />
+                <Route path="/tickets" element={<TicketsPage />} />
               </Routes>
             </Layout>
           </div>

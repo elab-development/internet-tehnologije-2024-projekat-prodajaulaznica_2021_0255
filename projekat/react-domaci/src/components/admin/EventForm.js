@@ -18,6 +18,21 @@ const EventForm = ({ event = null, onSave, onCancel }) => {
     category_id: "",
     featured: false,
   });
+
+  // Add new state for file uploads
+  const [imageFiles, setImageFiles] = useState({
+    main: null,
+    thumbnail: null,
+  });
+  const [uploadingImages, setUploadingImages] = useState({
+    main: false,
+    thumbnail: false,
+  });
+  const [imagePreview, setImagePreview] = useState({
+    main: "",
+    thumbnail: "",
+  });
+
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
@@ -55,6 +70,12 @@ const EventForm = ({ event = null, onSave, onCancel }) => {
         category_id: event.category?.id || "",
         featured: event.featured || false,
       });
+
+      // Set existing images for preview
+      setImagePreview({
+        main: event.image_url || "",
+        thumbnail: event.thumbnail_url || "",
+      });
     }
   }, [event]);
 
@@ -90,6 +111,84 @@ const EventForm = ({ event = null, onSave, onCancel }) => {
         ...prev,
         [name]: "",
       }));
+    }
+  };
+
+  // Add new method for handling file selection
+  const handleFileSelect = (e, type) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Validate file
+      if (!file.type.startsWith("image/")) {
+        setErrors((prev) => ({
+          ...prev,
+          [`${type}_image`]: "Molimo izaberite sliku",
+        }));
+        return;
+      }
+
+      if (file.size > 5 * 1024 * 1024) {
+        // 5MB
+        setErrors((prev) => ({
+          ...prev,
+          [`${type}_image`]: "Slika ne sme biti veća od 5MB",
+        }));
+        return;
+      }
+
+      setImageFiles((prev) => ({
+        ...prev,
+        [type]: file,
+      }));
+
+      // Create preview
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setImagePreview((prev) => ({
+          ...prev,
+          [type]: e.target.result,
+        }));
+      };
+      reader.readAsDataURL(file);
+
+      // Clear any previous errors
+      setErrors((prev) => ({
+        ...prev,
+        [`${type}_image`]: "",
+      }));
+    }
+  };
+
+  // Add method for uploading images
+  const uploadImage = async (file, type) => {
+    setUploadingImages((prev) => ({ ...prev, [type]: true }));
+
+    try {
+      const formDataUpload = new FormData();
+      formDataUpload.append("image", file);
+      formDataUpload.append("type", type);
+
+      const response = await apiService.uploadEventImage(formDataUpload);
+
+      if (response.success) {
+        const urlField = type === "main" ? "image_url" : "thumbnail_url";
+        setFormData((prev) => ({
+          ...prev,
+          [urlField]: response.data.url,
+        }));
+
+        return response.data.url;
+      } else {
+        throw new Error(response.message);
+      }
+    } catch (error) {
+      setErrors((prev) => ({
+        ...prev,
+        [`${type}_image`]: error.message || "Greška pri upload-u slike",
+      }));
+      throw error;
+    } finally {
+      setUploadingImages((prev) => ({ ...prev, [type]: false }));
     }
   };
 
@@ -195,6 +294,7 @@ const EventForm = ({ event = null, onSave, onCancel }) => {
     }
   };
 
+  // Updated handleSubmit method
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -208,13 +308,29 @@ const EventForm = ({ event = null, onSave, onCancel }) => {
     setErrors({});
 
     try {
+      let finalFormData = { ...formData };
+
+      // Upload images if new files are selected
+      if (imageFiles.main) {
+        const mainImageUrl = await uploadImage(imageFiles.main, "main");
+        finalFormData.image_url = mainImageUrl;
+      }
+
+      if (imageFiles.thumbnail) {
+        const thumbnailUrl = await uploadImage(
+          imageFiles.thumbnail,
+          "thumbnail"
+        );
+        finalFormData.thumbnail_url = thumbnailUrl;
+      }
+
       const eventData = {
-        ...formData,
-        price: parseFloat(formData.price),
-        total_tickets: parseInt(formData.total_tickets),
+        ...finalFormData,
+        price: parseFloat(finalFormData.price),
+        total_tickets: parseInt(finalFormData.total_tickets),
         available_tickets: isEditing
-          ? parseInt(formData.available_tickets)
-          : parseInt(formData.total_tickets),
+          ? parseInt(finalFormData.available_tickets)
+          : parseInt(finalFormData.total_tickets),
       };
 
       let response;
@@ -247,6 +363,13 @@ const EventForm = ({ event = null, onSave, onCancel }) => {
       (parseInt(formData.total_tickets) || 0) -
       (parseInt(formData.available_tickets) || 0)
     );
+  };
+
+  const removeImage = (type) => {
+    setImagePreview((prev) => ({ ...prev, [type]: "" }));
+    setImageFiles((prev) => ({ ...prev, [type]: null }));
+    const urlField = type === "main" ? "image_url" : "thumbnail_url";
+    setFormData((prev) => ({ ...prev, [urlField]: "" }));
   };
 
   return (
@@ -473,36 +596,226 @@ const EventForm = ({ event = null, onSave, onCancel }) => {
         )}
       </div>
 
-      {/* Images */}
+      {/* Updated Images section */}
       <div style={{ marginBottom: "2rem" }}>
         <h3 style={{ marginBottom: "1rem", color: "#333" }}>Slike</h3>
 
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
-            gap: "1rem",
+            gridTemplateColumns: "1fr 1fr",
+            gap: "2rem",
           }}
         >
-          <InputField
-            label="URL glavne slike"
-            name="image_url"
-            type="url"
-            value={formData.image_url}
-            onChange={handleChange}
-            error={errors.image_url}
-            placeholder="https://example.com/image.jpg"
-          />
+          {/* Main image upload */}
+          <div>
+            <label
+              style={{
+                display: "block",
+                marginBottom: "0.5rem",
+                fontWeight: "500",
+              }}
+            >
+              Glavna slika
+            </label>
 
-          <InputField
-            label="URL thumbnail slike"
-            name="thumbnail_url"
-            type="url"
-            value={formData.thumbnail_url}
-            onChange={handleChange}
-            error={errors.thumbnail_url}
-            placeholder="https://example.com/thumbnail.jpg"
-          />
+            <div
+              style={{
+                position: "relative",
+                border: "2px dashed #ddd",
+                borderRadius: "8px",
+                padding: "1rem",
+                textAlign: "center",
+                backgroundColor: "#fafafa",
+                cursor: "pointer",
+              }}
+            >
+              {imagePreview.main || formData.image_url ? (
+                <div>
+                  <img
+                    src={imagePreview.main || formData.image_url}
+                    alt="Preview"
+                    style={{
+                      maxWidth: "100%",
+                      maxHeight: "200px",
+                      borderRadius: "4px",
+                      marginBottom: "1rem",
+                    }}
+                  />
+                  <div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="small"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        removeImage("main");
+                      }}
+                    >
+                      Ukloni
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>
+                    📷
+                  </div>
+                  <p>Kliknite da izaberete glavnu sliku</p>
+                </div>
+              )}
+
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => handleFileSelect(e, "main")}
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  opacity: 0,
+                  width: "100%",
+                  height: "100%",
+                  cursor: "pointer",
+                }}
+              />
+            </div>
+
+            {uploadingImages.main && (
+              <div
+                style={{
+                  textAlign: "center",
+                  marginTop: "0.5rem",
+                  color: "#666",
+                }}
+              >
+                Uploading...
+              </div>
+            )}
+
+            {errors.main_image && (
+              <span style={{ color: "#e53e3e", fontSize: "0.875rem" }}>
+                {errors.main_image}
+              </span>
+            )}
+
+            <div style={{ marginTop: "1rem" }}>
+              <InputField
+                label="Ili unesite URL glavne slike"
+                name="image_url"
+                type="url"
+                value={formData.image_url}
+                onChange={handleChange}
+                error={errors.image_url}
+                placeholder="https://example.com/image.jpg"
+              />
+            </div>
+          </div>
+
+          {/* Thumbnail upload */}
+          <div>
+            <label
+              style={{
+                display: "block",
+                marginBottom: "0.5rem",
+                fontWeight: "500",
+              }}
+            >
+              Thumbnail slika
+            </label>
+
+            <div
+              style={{
+                position: "relative",
+                border: "2px dashed #ddd",
+                borderRadius: "8px",
+                padding: "1rem",
+                textAlign: "center",
+                backgroundColor: "#fafafa",
+                cursor: "pointer",
+              }}
+            >
+              {imagePreview.thumbnail || formData.thumbnail_url ? (
+                <div>
+                  <img
+                    src={imagePreview.thumbnail || formData.thumbnail_url}
+                    alt="Thumbnail Preview"
+                    style={{
+                      maxWidth: "100%",
+                      maxHeight: "200px",
+                      borderRadius: "4px",
+                      marginBottom: "1rem",
+                    }}
+                  />
+                  <div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="small"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        removeImage("thumbnail");
+                      }}
+                    >
+                      Ukloni
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div style={{ fontSize: "2rem", marginBottom: "1rem" }}>
+                    🖼️
+                  </div>
+                  <p>Kliknite da izaberete thumbnail</p>
+                </div>
+              )}
+
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => handleFileSelect(e, "thumbnail")}
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  opacity: 0,
+                  width: "100%",
+                  height: "100%",
+                  cursor: "pointer",
+                }}
+              />
+            </div>
+
+            {uploadingImages.thumbnail && (
+              <div
+                style={{
+                  textAlign: "center",
+                  marginTop: "0.5rem",
+                  color: "#666",
+                }}
+              >
+                Uploading...
+              </div>
+            )}
+
+            {errors.thumbnail_image && (
+              <span style={{ color: "#e53e3e", fontSize: "0.875rem" }}>
+                {errors.thumbnail_image}
+              </span>
+            )}
+
+            <div style={{ marginTop: "1rem" }}>
+              <InputField
+                label="Ili unesite URL thumbnail slike"
+                name="thumbnail_url"
+                type="url"
+                value={formData.thumbnail_url}
+                onChange={handleChange}
+                error={errors.thumbnail_url}
+                placeholder="https://example.com/thumbnail.jpg"
+              />
+            </div>
+          </div>
         </div>
       </div>
 

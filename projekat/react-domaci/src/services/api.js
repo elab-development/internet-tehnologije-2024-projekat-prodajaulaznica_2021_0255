@@ -347,6 +347,14 @@ export const apiService = {
   generateReceipt: async (ticketId) => {
     return await api.get(`/tickets/${ticketId}/receipt`);
   },
+
+  uploadEventImage: async (formData) => {
+    return await api.post("/events/upload-image", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+  },
 };
 
 export default apiService;

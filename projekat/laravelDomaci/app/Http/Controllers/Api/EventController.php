@@ -340,41 +340,52 @@ class EventController extends Controller
      * )
      */
     public function store(Request $request): JsonResponse
-    {
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'description' => 'required|string',
-            'image_url' => 'nullable|url',
-            'thumbnail_url' => 'nullable|url',
-            'start_date' => 'required|date',
-            'end_date' => 'required|date',
-            'location' => 'required|string|max:255',
-            'price' => 'required|numeric|min:0',
-            'total_tickets' => 'required|integer|min:1',
-            'category_id' => 'required'
+{
+    $request->validate([
+        'name' => 'required|string|max:255',
+        'description' => 'required|string',
+        'image_url' => 'nullable|string',
+        'thumbnail_url' => 'nullable|string',
+        'start_date' => 'required|date',
+        'end_date' => 'required|date|after:start_date',
+        'location' => 'required|string|max:255',
+        'price' => 'required|numeric|min:0',
+        'total_tickets' => 'required|integer|min:1',
+        'category_id' => 'required|exists:categories,id',
+        'featured' => 'sometimes|boolean'
+    ]);
+
+
+    try {
+        $eventData = $request->only([
+            'name', 'description', 'image_url', 'thumbnail_url',
+            'start_date', 'end_date', 'location', 'price',
+            'total_tickets', 'category_id', 'featured'
         ]);
 
-        $event = Event::create([
-            'name' => $request->name,
-            'description' => $request->description,
-            'image_url' => $request->image_url,
-            'thumbnail_url' => $request->thumbnail_url,
-            'start_date' => $request->start_date,
-            'end_date' => $request->end_date,
-            'location' => $request->location,
-            'price' => $request->price,
-            'total_tickets' => $request->total_tickets,
-            'available_tickets' => $request->total_tickets, // inicijalno svi su dostupni
-            'category_id' => $request->category_id
-        ]);
 
+        $eventData['available_tickets'] = $eventData['total_tickets'];
+
+
+        $event = Event::create($eventData);
         $event->load('category');
 
+
         return response()->json([
+            'success' => true,
             'message' => 'Event created successfully',
-            'event' => $event
+            'data' => new EventResource($event)
         ], 201);
+
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Error creating event: ' . $e->getMessage(),
+            'data' => null
+        ], 500);
     }
+}
 
     /**
      * @OA\Get(
@@ -748,4 +759,47 @@ class EventController extends Controller
             'tickets' => $event->tickets
         ]);
     }
+
+    public function uploadImage(Request $request): JsonResponse
+{
+    $request->validate([
+        'image' => 'required|image|mimes:jpeg,png,jpg,gif|max:5120', // 5MB max
+        'type' => 'required|in:main,thumbnail'
+    ]);
+
+
+    try {
+        $image = $request->file('image');
+        $type = $request->get('type', 'main');
+        
+        // Generate unique filename
+        $filename = time() . '_' . $type . '_' . Str::random(10) . '.' . $image->getClientOriginalExtension();
+        
+        // Store in public/storage/events directory
+        $path = $image->storeAs('events', $filename, 'public');
+        
+        // Generate full URL
+        $imageUrl = asset('storage/' . $path);
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'Image uploaded successfully',
+            'data' => [
+                'url' => $imageUrl,
+                'path' => $path,
+                'filename' => $filename,
+                'type' => $type
+            ]
+        ]);
+
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Error uploading image: ' . $e->getMessage(),
+            'data' => null
+        ], 500);
+    }
+}
+
 }

@@ -142,4 +142,90 @@ public function logout(Request $request)
     {
         return config('frontend.url');
     }
+/**
+     * @OA\Post(
+     * path="/api/refresh-token",
+     * summary="Refreshes the user's access token",
+     * tags={"Auth"},
+     * security={{"bearerAuth":{}}},
+     * @OA\Response(
+     * response=200,
+     * description="Token refreshed successfully",
+     * @OA\JsonContent(
+     * @OA\Property(property="message", type="string", example="Token refreshed successfully"),
+     * @OA\Property(property="user", type="object",
+     * @OA\Property(property="id", type="integer", example=1),
+     * @OA\Property(property="name", type="string", example="John Doe"),
+     * @OA\Property(property="email", type="string", example="john.doe@example.com")
+     * ),
+     * @OA\Property(property="access_token", type="string", example="1|12345abcdefg..."),
+     * @OA\Property(property="token_type", type="string", example="Bearer")
+     * )
+     * ),
+     * @OA\Response(
+     * response=401,
+     * description="Unauthorized",
+     * @OA\JsonContent(
+     * @OA\Property(property="message", type="string", example="Token refresh failed")
+     * )
+     * )
+     * )
+     */
+    public function refresh(Request $request)
+    {
+        try {
+            $user = $request->user();
+            
+            // Delete current token
+            $request->user()->currentAccessToken()->delete();
+            
+            // Create new token
+            $newToken = $user->createToken('auth_token')->plainTextToken;
+            
+            return response()->json([
+                'message' => 'Token refreshed successfully',
+                'user' => $user,
+                'access_token' => $newToken,
+                'token_type' => 'Bearer',
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Token refresh failed'
+            ], 401);
+        }
+    }
+/**
+     * @OA\Get(
+     * path="/api/user",
+     * summary="Get the authenticated user's details",
+     * tags={"Auth"},
+     * security={{"bearerAuth":{}}},
+     * @OA\Response(
+     * response=200,
+     * description="User data retrieved successfully",
+     * @OA\JsonContent(
+     * @OA\Property(property="message", type="string", example="User data retrieved successfully"),
+     * @OA\Property(property="user", type="object",
+     * @OA\Property(property="id", type="integer", example=1),
+     * @OA\Property(property="name", type="string", example="John Doe"),
+     * @OA\Property(property="email", type="string", example="john.doe@example.com")
+     * )
+     * )
+     * ),
+     * @OA\Response(
+     * response=401,
+     * description="Unauthorized",
+     * @OA\JsonContent(
+     * @OA\Property(property="message", type="string", example="Unauthenticated.")
+     * )
+     * )
+     * )
+     */
+    public function user(Request $request)
+    {
+        return response()->json([
+            'message' => 'User data retrieved successfully',
+            'user' => $request->user()
+        ]);
+    }
 }

@@ -4,12 +4,28 @@ import axios from "axios";
 const api = axios.create({
   baseURL: "http://localhost:8000/api",
   timeout: 10000,
-  withCredentials: true, // Important for Sanctum
+  withCredentials: true,
   headers: {
     Accept: "application/json",
     "Content-Type": "application/json",
   },
 });
+
+// Token refresh functionality
+let isRefreshing = false;
+let failedQueue = [];
+
+const processQueue = (error, token = null) => {
+  failedQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
+  });
+
+  failedQueue = [];
+};
 
 // Request interceptor to add auth token
 api.interceptors.request.use(
@@ -25,25 +41,85 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor to handle errors
+// Response interceptor with token refresh logic
 api.interceptors.response.use(
   (response) => {
-    return response.data; // Return standardized API response
+    return response.data;
   },
-  (error) => {
-    if (error.response?.status === 401) {
-      // Token expired or invalid
-      localStorage.removeItem("auth_token");
-      localStorage.removeItem("user");
+  async (error) => {
+    const originalRequest = error.config;
 
-      // Only redirect if not already on login page
-      if (!window.location.pathname.includes("/login")) {
-        window.location.href = "/login";
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      if (isRefreshing) {
+        // If already refreshing, queue the request
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        })
+          .then((token) => {
+            originalRequest.headers.Authorization = `Bearer ${token}`;
+            return api(originalRequest);
+          })
+          .catch((err) => {
+            return Promise.reject(err);
+          });
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      try {
+        // Attempt to refresh token
+        const refreshResponse = await refreshToken();
+        const newToken = refreshResponse.access_token;
+
+        localStorage.setItem("auth_token", newToken);
+        processQueue(null, newToken);
+
+        // Retry original request with new token
+        originalRequest.headers.Authorization = `Bearer ${newToken}`;
+        return api(originalRequest);
+      } catch (refreshError) {
+        processQueue(refreshError, null);
+
+        // Refresh failed, clear auth data and redirect
+        localStorage.removeItem("auth_token");
+        localStorage.removeItem("user");
+
+        if (!window.location.pathname.includes("/login")) {
+          window.location.href = "/login";
+        }
+
+        return Promise.reject(refreshError);
+      } finally {
+        isRefreshing = false;
       }
     }
+
     return Promise.reject(error.response?.data || error);
   }
 );
+
+// Token refresh function
+const refreshToken = async () => {
+  const token = localStorage.getItem("auth_token");
+  if (!token) {
+    throw new Error("No token available");
+  }
+
+  const response = await axios.post(
+    "http://localhost:8000/api/refresh",
+    {},
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+      },
+      withCredentials: true,
+    }
+  );
+
+  return response.data.data;
+};
 
 export const apiService = {
   // Authentication
@@ -63,7 +139,16 @@ export const apiService = {
     return await api.post("/logout");
   },
 
-  // Events
+  refreshToken: async () => {
+    return await refreshToken();
+  },
+
+  // Check if token is valid
+  checkAuth: async () => {
+    return await api.get("/user");
+  },
+
+  // ... rest of existing methods remain the same
   getEvents: async (page = 1, limit = 6) => {
     const response = await api.get(`/events?page=${page}&limit=${limit}`);
     return {
@@ -103,7 +188,6 @@ export const apiService = {
     return await api.delete(`/events/${id}`);
   },
 
-  // Categories
   getCategories: async () => {
     return await api.get("/categories");
   },
@@ -124,7 +208,6 @@ export const apiService = {
     return await api.delete(`/categories/${id}`);
   },
 
-  // Tickets
   purchaseTicket: async (ticketData) => {
     return await api.post("/tickets/purchase", ticketData);
   },

@@ -37,6 +37,8 @@ Route::get('tickets/validate/{ticketNumber}', [TicketController::class, 'validat
 Route::middleware('auth:sanctum')->group(function () {
     // Auth routes
     Route::post('logout', [AuthController::class, 'logout']);
+    Route::post('refresh', [AuthController::class, 'refresh']);
+    Route::get('user', [AuthController::class, 'user']);
     
     // Events - CRUD operations for authenticated users
     Route::post('events', [EventController::class, 'store']);

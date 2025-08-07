@@ -138,6 +138,40 @@ export const AuthProvider = ({ children }) => {
     window.location.href = "/login";
   };
 
+  // Handle token refresh
+  const checkAuthStatus = async () => {
+    if (!token) return false;
+
+    try {
+      const response = await apiService.checkAuth();
+      if (response.success) {
+        // Update user data if needed
+        if (response.data.user) {
+          updateUser(response.data.user);
+        }
+        return true;
+      }
+    } catch (error) {
+      console.error("Auth check failed:", error);
+      clearAuthData();
+      return false;
+    }
+
+    return false;
+  };
+
+  // Periodic auth check
+  useEffect(() => {
+    if (isAuthenticated()) {
+      // Check auth status every 10 minutes
+      const interval = setInterval(() => {
+        checkAuthStatus();
+      }, 10 * 60 * 1000);
+
+      return () => clearInterval(interval);
+    }
+  }, [isAuthenticated, token]);
+
   const updateUser = (userData) => {
     const updatedUser = { ...user, ...userData };
     setUser(updatedUser);

@@ -35,6 +35,7 @@ Route::get('categories/{id}/statistics', [CategoryController::class, 'getStatist
 // Public ticket validation
 Route::get('tickets/validate/{ticketNumber}', [TicketController::class, 'validateTicket']);
 Route::post('tickets/validate/bulk', [TicketController::class, 'validateBulk']);
+Route::get('events/{eventId}/cancellation-policy', [TicketController::class, 'getCancellationPolicy']);
 
 // Protected routes (authentication required)
 Route::middleware('auth:sanctum')->group(function () {

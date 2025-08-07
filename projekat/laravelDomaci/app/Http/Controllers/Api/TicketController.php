@@ -546,8 +546,8 @@ class TicketController extends Controller
     /**
      * @OA\Put(
      *     path="/api/tickets/{id}/cancel",
-     *     summary="Cancel a ticket",
-     *     description="Cancels a user's ticket if eligible. Tickets cannot be cancelled after the event has started or if already used/cancelled.",
+     *     summary="Cancel a ticket with refund calculation",
+     *     description="Cancels a user's ticket with intelligent refund calculation based on cancellation timing and policy. Includes comprehensive validation and refund processing.",
      *     operationId="cancelTicket",
      *     tags={"Tickets"},
      *     security={{"sanctum":{}}},
@@ -564,56 +564,363 @@ class TicketController extends Controller
      *         response=200,
      *         description="Ticket cancelled successfully",
      *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Ticket cancelled successfully")
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Ticket cancelled successfully"),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="ticket", ref="#/components/schemas/TicketResource"),
+     *                 @OA\Property(property="refund_info", type="object",
+     *                     @OA\Property(property="original_price", type="number", format="float", example=100.00),
+     *                     @OA\Property(property="cancellation_fee_percentage", type="number", format="float", example=10),
+     *                     @OA\Property(property="cancellation_fee", type="number", format="float", example=10.00),
+     *                     @OA\Property(property="refund_percentage", type="number", format="float", example=90),
+     *                     @OA\Property(property="refund_amount", type="number", format="float", example=90.00),
+     *                     @OA\Property(property="hours_until_event", type="integer", example=120),
+     *                     @OA\Property(property="policy_applied", type="string", example="3-7 days before event: 10% cancellation fee")
+     *                 )
+     *             )
      *         )
      *     ),
      *     @OA\Response(
      *         response=422,
      *         description="Cannot cancel ticket",
      *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Cannot cancel ticket for events that have already started")
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Cannot cancel ticket for events that have already started"),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="ticket", ref="#/components/schemas/TicketResource"),
+     *                 @OA\Property(property="cancellation_info", type="object",
+     *                     @OA\Property(property="can_cancel", type="boolean", example=false),
+     *                     @OA\Property(property="reason", type="string", example="Cannot cancel ticket for events that have already started"),
+     *                     @OA\Property(property="code", type="string", example="event_started")
+     *                 )
+     *             )
      *         )
      *     ),
      *     @OA\Response(
      *         response=404,
      *         description="Ticket not found",
      *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Ticket not found")
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Ticket not found"),
+     *             @OA\Property(property="data", type="null")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Server error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Error cancelling ticket"),
+     *             @OA\Property(property="data", type="null")
      *         )
      *     )
      * )
      */
     public function cancel($id): JsonResponse
     {
-        $ticket = Ticket::where('user_id', auth()->id())->findOrFail($id);
+        try {
+            DB::beginTransaction();
 
-        if ($ticket->status === 'cancelled') {
+            $ticket = Ticket::with(['event', 'user'])
+                ->where('user_id', auth()->id())
+                ->findOrFail($id);
+
+            // Check if ticket can be cancelled
+            $cancellationResult = $this->canCancelTicket($ticket);
+            
+            if (!$cancellationResult['can_cancel']) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $cancellationResult['reason'],
+                    'data' => [
+                        'ticket' => new TicketResource($ticket),
+                        'cancellation_info' => $cancellationResult
+                    ]
+                ], 422);
+            }
+
+            // Calculate refund amount
+            $refundInfo = $this->calculateRefund($ticket);
+
+            // Mark ticket as cancelled
+            $ticket->update([
+                'status' => 'cancelled',
+                'cancelled_at' => now(),
+                'refund_amount' => $refundInfo['refund_amount'],
+                'cancellation_fee' => $refundInfo['cancellation_fee']
+            ]);
+
+            // Return available tickets to the event
+            $ticket->event->increment('available_tickets');
+
+            // Log the cancellation
+            \Log::info('Ticket cancelled', [
+                'ticket_id' => $ticket->id,
+                'ticket_number' => $ticket->ticket_number,
+                'user_id' => $ticket->user_id,
+                'event_id' => $ticket->event_id,
+                'refund_amount' => $refundInfo['refund_amount'],
+                'cancellation_fee' => $refundInfo['cancellation_fee'],
+                'cancelled_at' => now()
+            ]);
+
+            DB::commit();
+
             return response()->json([
-                'message' => 'Ticket is already cancelled'
-            ], 422);
+                'success' => true,
+                'message' => 'Ticket cancelled successfully',
+                'data' => [
+                    'ticket' => new TicketResource($ticket),
+                    'refund_info' => $refundInfo
+                ]
+            ]);
+
+        } catch (ModelNotFoundException $e) {
+            DB::rollback();
+            return response()->json([
+                'success' => false,
+                'message' => 'Ticket not found',
+                'data' => null
+            ], 404);
+        } catch (\Exception $e) {
+            DB::rollback();
+            return response()->json([
+                'success' => false,
+                'message' => 'Error cancelling ticket',
+                'data' => null
+            ], 500);
+        }
+    }
+
+    /**
+     * Check if ticket can be cancelled
+     */
+    private function canCancelTicket(Ticket $ticket): array
+    {
+        $now = now();
+        $event = $ticket->event;
+
+        // Check if ticket is already cancelled
+        if ($ticket->status === 'cancelled') {
+            return [
+                'can_cancel' => false,
+                'reason' => 'Ticket is already cancelled',
+                'code' => 'already_cancelled'
+            ];
         }
 
+        // Check if ticket is already used
         if ($ticket->status === 'used') {
-            return response()->json([
-                'message' => 'Cannot cancel used ticket'
-            ], 422);
+            return [
+                'can_cancel' => false,
+                'reason' => 'Cannot cancel used ticket',
+                'code' => 'already_used'
+            ];
         }
 
         // Check if event has already started
-        if ($ticket->event->start_date <= now()) {
-            return response()->json([
-                'message' => 'Cannot cancel ticket for events that have already started'
-            ], 422);
+        if ($event->start_date <= $now) {
+            return [
+                'can_cancel' => false,
+                'reason' => 'Cannot cancel ticket for events that have already started',
+                'code' => 'event_started'
+            ];
         }
 
-        $ticket->update(['status' => 'cancelled']);
-        
-        // Return tickets to available count
-        $ticket->event->increment('available_tickets');
+        // Check cancellation deadline (e.g., 24 hours before event)
+        $cancellationDeadline = $event->start_date->copy()->subHours(24);
+        if ($now > $cancellationDeadline) {
+            return [
+                'can_cancel' => false,
+                'reason' => 'Cancellation deadline has passed (24 hours before event)',
+                'code' => 'deadline_passed',
+                'deadline' => $cancellationDeadline
+            ];
+        }
 
-        return response()->json([
-            'message' => 'Ticket cancelled successfully'
-        ]);
+        // Check if event is too far in the future (optional business rule)
+        $maxCancellationPeriod = $ticket->purchase_date->copy()->addDays(30);
+        if ($now > $maxCancellationPeriod) {
+            return [
+                'can_cancel' => false,
+                'reason' => 'Cancellation period has expired (30 days after purchase)',
+                'code' => 'period_expired',
+                'expiry_date' => $maxCancellationPeriod
+            ];
+        }
+
+        return [
+            'can_cancel' => true,
+            'reason' => 'Ticket can be cancelled',
+            'code' => 'can_cancel',
+            'deadline' => $cancellationDeadline
+        ];
+    }
+
+    /**
+     * Calculate refund amount based on cancellation policy
+     */
+    private function calculateRefund(Ticket $ticket): array
+    {
+        $originalPrice = $ticket->price;
+        $event = $ticket->event;
+        $now = now();
+        
+        // Calculate hours until event
+        $hoursUntilEvent = $now->diffInHours($event->start_date);
+        
+        // Cancellation fee structure
+        $cancellationFeePercentage = 0;
+        $refundPercentage = 100;
+        
+        if ($hoursUntilEvent >= 168) { // 7 days or more
+            $cancellationFeePercentage = 5; // 5% fee
+            $refundPercentage = 95;
+        } elseif ($hoursUntilEvent >= 72) { // 3-7 days
+            $cancellationFeePercentage = 10; // 10% fee
+            $refundPercentage = 90;
+        } elseif ($hoursUntilEvent >= 24) { // 1-3 days
+            $cancellationFeePercentage = 20; // 20% fee
+            $refundPercentage = 80;
+        } else {
+            // Less than 24 hours - no refund
+            $cancellationFeePercentage = 100;
+            $refundPercentage = 0;
+        }
+        
+        $cancellationFee = $originalPrice * ($cancellationFeePercentage / 100);
+        $refundAmount = $originalPrice * ($refundPercentage / 100);
+        
+        return [
+            'original_price' => $originalPrice,
+            'cancellation_fee_percentage' => $cancellationFeePercentage,
+            'cancellation_fee' => $cancellationFee,
+            'refund_percentage' => $refundPercentage,
+            'refund_amount' => $refundAmount,
+            'hours_until_event' => $hoursUntilEvent,
+            'policy_applied' => $this->getCancellationPolicyText($hoursUntilEvent)
+        ];
+    }
+
+    /**
+     * Get cancellation policy text
+     */
+    private function getCancellationPolicyText(int $hoursUntilEvent): string
+    {
+        if ($hoursUntilEvent >= 168) {
+            return '7+ days before event: 5% cancellation fee';
+        } elseif ($hoursUntilEvent >= 72) {
+            return '3-7 days before event: 10% cancellation fee';
+        } elseif ($hoursUntilEvent >= 24) {
+            return '1-3 days before event: 20% cancellation fee';
+        } else {
+            return 'Less than 24 hours: No refund';
+        }
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/events/{eventId}/cancellation-policy",
+     *     summary="Get cancellation policy for an event",
+     *     description="Retrieves the detailed cancellation policy including fee structure and general rules for a specific event",
+     *     operationId="getCancellationPolicy",
+     *     tags={"Tickets"},
+     *     
+     *     @OA\Parameter(
+     *         name="eventId",
+     *         in="path",
+     *         required=true,
+     *         description="Event ID",
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
+     *     
+     *     @OA\Response(
+     *         response=200,
+     *         description="Cancellation policy retrieved successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Cancellation policy retrieved successfully"),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="general_rules", type="array",
+     *                     @OA\Items(type="string", example="Tickets can be cancelled up to 24 hours before the event")
+     *                 ),
+     *                 @OA\Property(property="fee_structure", type="array",
+     *                     @OA\Items(type="object",
+     *                         @OA\Property(property="period", type="string", example="7+ days before event"),
+     *                         @OA\Property(property="fee_percentage", type="integer", example=5),
+     *                         @OA\Property(property="refund_percentage", type="integer", example=95)
+     *                     )
+     *                 ),
+     *                 @OA\Property(property="exceptions", type="array",
+     *                     @OA\Items(type="string", example="Event cancellation: Full refund")
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Event not found",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Event not found"),
+     *             @OA\Property(property="data", type="null")
+     *         )
+     *     )
+     * )
+     */
+    public function getCancellationPolicy($eventId): JsonResponse
+    {
+        try {
+            $event = Event::findOrFail($eventId);
+            
+            $policy = [
+                'general_rules' => [
+                    'Tickets can be cancelled up to 24 hours before the event',
+                    'Cancellation fees apply based on timing',
+                    'Refunds are processed within 5-7 business days'
+                ],
+                'fee_structure' => [
+                    [
+                        'period' => '7+ days before event',
+                        'fee_percentage' => 5,
+                        'refund_percentage' => 95
+                    ],
+                    [
+                        'period' => '3-7 days before event',
+                        'fee_percentage' => 10,
+                        'refund_percentage' => 90
+                    ],
+                    [
+                        'period' => '1-3 days before event',
+                        'fee_percentage' => 20,
+                        'refund_percentage' => 80
+                    ],
+                    [
+                        'period' => 'Less than 24 hours',
+                        'fee_percentage' => 100,
+                        'refund_percentage' => 0
+                    ]
+                ],
+                'exceptions' => [
+                    'Event cancellation: Full refund',
+                    'Event postponement: Free transfer or full refund',
+                    'Force majeure: Case by case basis'
+                ]
+            ];
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Cancellation policy retrieved successfully',
+                'data' => $policy
+            ]);
+
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Event not found',
+                'data' => null
+            ], 404);
+        }
     }
 
     /**

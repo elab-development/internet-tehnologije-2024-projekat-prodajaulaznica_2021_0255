@@ -3,6 +3,7 @@ import Button from "../common/Button";
 import InputField from "../common/InputField";
 import Modal from "../common/Modal";
 import Pagination from "../common/Pagination";
+import TicketCancellation from "./TicketCancellation";
 import { useAuth } from "../../context/AuthContext";
 import apiService from "../../services/api";
 
@@ -12,6 +13,7 @@ const UserTicketsDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedTicket, setSelectedTicket] = useState(null);
+  const [cancellingTicket, setCancellingTicket] = useState(null);
   const [filters, setFilters] = useState({
     status: "all",
     search: "",
@@ -59,22 +61,18 @@ const UserTicketsDashboard = () => {
     setCurrentPage(1); // Reset to first page when filters change
   };
 
-  const handleCancelTicket = async (ticketId) => {
-    if (!window.confirm("Da li ste sigurni da želite da otkažete ovu kartu?")) {
-      return;
-    }
+  const handleCancelTicket = (ticket) => {
+    setCancellingTicket(ticket);
+  };
 
-    try {
-      const response = await apiService.cancelTicket(ticketId);
-
-      if (response.success) {
-        loadTickets(); // Refresh the list
-        setSelectedTicket(null);
-        alert("Karta je uspešno otkazana");
-      }
-    } catch (err) {
-      alert("Greška pri otkazivanju karte: " + err.message);
-    }
+  const handleCancellationSuccess = (result) => {
+    setCancellingTicket(null);
+    loadTickets(); // Refresh the list
+    alert(
+      `Karta je uspešno otkazana. Povraćaj: ${formatPrice(
+        result.refund_info.refund_amount
+      )} RSD`
+    );
   };
 
   const handleDownloadTicket = async (ticket) => {
@@ -439,7 +437,7 @@ Molimo sačuvajte ovu kartu za ulaz na događaj.
                   key={ticket.id}
                   ticket={ticket}
                   onViewDetails={() => setSelectedTicket(ticket)}
-                  onCancel={() => handleCancelTicket(ticket.id)}
+                  onCancel={() => handleCancelTicket(ticket)}
                   onDownload={() => handleDownloadTicket(ticket)}
                   canCancelTicket={canCancelTicket}
                   isEventStartingSoon={isEventStartingSoon}
@@ -474,7 +472,7 @@ Molimo sačuvajte ovu kartu za ulaz na događaj.
           <TicketDetailsModal
             ticket={selectedTicket}
             onClose={() => setSelectedTicket(null)}
-            onCancel={() => handleCancelTicket(selectedTicket.id)}
+            onCancel={() => handleCancelTicket(selectedTicket)}
             onDownload={() => handleDownloadTicket(selectedTicket)}
             canCancelTicket={canCancelTicket}
             formatDate={formatDate}
@@ -484,6 +482,14 @@ Molimo sačuvajte ovu kartu za ulaz na događaj.
           />
         )}
       </Modal>
+
+      {/* Ticket cancellation modal */}
+      <TicketCancellation
+        ticket={cancellingTicket}
+        isOpen={!!cancellingTicket}
+        onClose={() => setCancellingTicket(null)}
+        onSuccess={handleCancellationSuccess}
+      />
     </div>
   );
 };

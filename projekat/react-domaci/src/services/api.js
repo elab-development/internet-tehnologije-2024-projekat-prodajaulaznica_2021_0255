@@ -306,6 +306,15 @@ export const apiService = {
   getCategoryStatistics: async (categoryId) => {
     return await api.get(`/categories/${categoryId}/statistics`);
   },
+
+  // Ticket cancellation
+  cancelTicket: async (ticketId, data = {}) => {
+    return await api.patch(`/tickets/${ticketId}/cancel`, data);
+  },
+
+  getCancellationPolicy: async (eventId) => {
+    return await api.get(`/events/${eventId}/cancellation-policy`);
+  },
 };
 
 export default apiService;

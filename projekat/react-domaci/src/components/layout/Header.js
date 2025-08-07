@@ -14,13 +14,11 @@ const Header = () => {
   const location = useLocation();
   // Use the useAuth hook to get the isAdmin and isAuthenticated functions
   const { isAdmin, isAuthenticated } = useAuth();
-
   // Calculate the total number of items in the cart
   const cartItemsCount = cartItems.reduce(
     (total, item) => total + item.quantity,
     0
   );
-
   // Helper function to determine if a link is the active one
   const isActive = (path) => {
     return location.pathname === path ? "nav-link active" : "nav-link";
@@ -33,7 +31,6 @@ const Header = () => {
         <Link to="/" className="logo">
           <h1>{APP_TITLE}</h1>
         </Link>
-
         {/* Navigation links */}
         <nav style={{ display: "flex", gap: "2rem", alignItems: "center" }}>
           <Link to="/" style={{ textDecoration: "none", color: "#333" }}>
@@ -48,7 +45,6 @@ const Header = () => {
           >
             Kategorije
           </Link>
-
           {isAuthenticated() && (
             <Link
               to="/tickets"
@@ -57,16 +53,24 @@ const Header = () => {
               Moje karte
             </Link>
           )}
-
           <Link to="/cart" style={{ textDecoration: "none", color: "#333" }}>
             Korpa{" "}
             {cartItemsCount > 0 && (
               <span className="cart-count">{cartItemsCount}</span>
             )}
           </Link>
-
           {isAdmin() && (
             <div style={{ display: "flex", gap: "1rem" }}>
+              <Link
+                to="/admin/dashboard"
+                style={{
+                  textDecoration: "none",
+                  color: "#e74c3c",
+                  fontWeight: "bold",
+                }}
+              >
+                Dashboard
+              </Link>
               <Link
                 to="/admin/events"
                 style={{
@@ -75,7 +79,7 @@ const Header = () => {
                   fontWeight: "bold",
                 }}
               >
-                Admin
+                Događaji
               </Link>
               <Link
                 to="/admin/validation"
@@ -89,7 +93,6 @@ const Header = () => {
               </Link>
             </div>
           )}
-
           <AuthStatus />
         </nav>
       </div>

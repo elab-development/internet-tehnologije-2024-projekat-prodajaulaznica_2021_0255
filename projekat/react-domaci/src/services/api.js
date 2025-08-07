@@ -355,6 +355,32 @@ export const apiService = {
       },
     });
   },
+  // Admin Dashboard
+  getAdminOverview: async () => {
+    return await api.get("/admin/dashboard/overview");
+  },
+
+  getRevenueChart: async (period = 30) => {
+    return await api.get(`/admin/dashboard/revenue-chart?period=${period}`);
+  },
+
+  getCategoryStats: async () => {
+    return await api.get("/admin/dashboard/category-stats");
+  },
+
+  getTopEvents: async (limit = 10, sortBy = "revenue") => {
+    return await api.get(
+      `/admin/dashboard/top-events?limit=${limit}&sort_by=${sortBy}`
+    );
+  },
+
+  getRecentActivity: async (limit = 20) => {
+    return await api.get(`/admin/dashboard/recent-activity?limit=${limit}`);
+  },
+
+  getUpcomingEvents: async () => {
+    return await api.get("/admin/dashboard/upcoming-events");
+  },
 };
 
 export default apiService;

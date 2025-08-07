@@ -18,6 +18,7 @@ import AdminRoute from "./components/common/AdminRoute/AdminRoute";
 import AdminEventsPage from "./pages/AdminEventsPage/AdminEventsPage";
 import TicketsPage from "./pages/TicketsPage/TicketsPage";
 import ValidationPage from "./pages/ValidationPage/ValidationPage";
+import AdminDashboardPage from "./pages/AdminDashboardPage/AdminDashboardPage";
 
 import "./App.css";
 
@@ -108,6 +109,15 @@ function App() {
                     </AdminRoute>
                   }
                 />
+                <Route
+                  path="/admin/dashboard"
+                  element={
+                    <AdminRoute>
+                      <AdminDashboardPage />
+                    </AdminRoute>
+                  }
+                />
+
                 <Route path="/tickets" element={<TicketsPage />} />
               </Routes>
             </Layout>

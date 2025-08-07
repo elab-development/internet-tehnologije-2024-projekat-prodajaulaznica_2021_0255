@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\TicketController;
+use App\Http\Controllers\Api\AdminDashboardController;
 
 Route::middleware(['api.errors', 'api.response'])->group(function () {
 
@@ -44,6 +45,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('logout', [AuthController::class, 'logout']);
     Route::post('refresh', [AuthController::class, 'refresh']);
     Route::get('user', [AuthController::class, 'user']);
+
+    Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
+        Route::get('dashboard/overview', [AdminDashboardController::class, 'getOverviewStats']);
+        Route::get('dashboard/revenue-chart', [AdminDashboardController::class, 'getRevenueChart']);
+        Route::get('dashboard/category-stats', [AdminDashboardController::class, 'getCategoryStats']);
+        Route::get('dashboard/top-events', [AdminDashboardController::class, 'getTopEvents']);
+        Route::get('dashboard/recent-activity', [AdminDashboardController::class, 'getRecentActivity']);
+        Route::get('dashboard/upcoming-events', [AdminDashboardController::class, 'getUpcomingEvents']);
+    });
+
     
     // Events - CRUD operations for authenticated users
     Route::post('events', [EventController::class, 'store']);

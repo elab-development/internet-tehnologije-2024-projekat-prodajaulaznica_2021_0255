@@ -5,6 +5,7 @@ import { useAuth } from "../../context/AuthContext";
 import LogoutButton from "../../components/common/LogoutButton";
 import UserProfile from "../../components/common/UserProfile";
 import PasswordChange from "../../components/common/PasswordChange";
+import PurchaseHistory from "../../components/tickets/PurchaseHistory";
 
 const ProfilePage = () => {
   const { user } = useAuth();
@@ -128,6 +129,11 @@ const ProfilePage = () => {
         <section className="user-management-section">
           <UserProfile />
           <PasswordChange />
+        </section>
+
+        {/* Purchase History section */}
+        <section className="tickets-section">
+          <PurchaseHistory />
         </section>
 
         {/* Vremenska prognoza sekcija */}

@@ -1,12 +1,10 @@
 // Update EventCard component to handle both old and new data structures
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { useCart } from "../../../context/CartContext";
-import Button from "../Button";
+import QuickPurchase from "../QuickPurchase";
 
 const EventCard = ({ event }) => {
   const navigate = useNavigate();
-  const { addToCart } = useCart();
 
   // Handle both old mock data and new Laravel API data
   const eventData = {
@@ -44,21 +42,6 @@ const EventCard = ({ event }) => {
       month: "long",
       day: "numeric",
     });
-  };
-
-  const handleAddToCart = () => {
-    const cartItem = {
-      id: eventData.id,
-      title: eventData.title,
-      price: eventData.price,
-      date: eventData.date,
-      time: eventData.time,
-      location: eventData.location,
-      image: eventData.image,
-      quantity: 1,
-    };
-
-    addToCart(cartItem);
   };
 
   return (
@@ -153,14 +136,13 @@ const EventCard = ({ event }) => {
       </div>
 
       <div style={{ padding: "0 1rem 1rem" }}>
-        <Button
+        <QuickPurchase
+          event={eventData}
+          buttonText={
+            eventData.availableTickets > 0 ? "Kupi karte" : "Rasprodato"
+          }
           size="small"
-          style={{ width: "100%" }}
-          onClick={handleAddToCart}
-          disabled={eventData.availableTickets === 0}
-        >
-          {eventData.availableTickets > 0 ? "Dodaj u korpu" : "Rasprodato"}
-        </Button>
+        />
       </div>
     </div>
   );

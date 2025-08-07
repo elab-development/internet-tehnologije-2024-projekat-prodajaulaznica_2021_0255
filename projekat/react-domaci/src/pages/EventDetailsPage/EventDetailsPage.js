@@ -4,6 +4,7 @@ import Breadcrumbs from "../../components/common/Breadcrumbs";
 import Button from "../../components/common/Button";
 import Modal from "../../components/common/Modal";
 import InputField from "../../components/common/InputField";
+import TicketPurchaseFlow from "../../components/tickets/TicketPurchaseFlow";
 import { useCart } from "../../context/CartContext";
 import { useAuth } from "../../context/AuthContext";
 import apiService from "../../services/api";
@@ -22,6 +23,7 @@ const EventDetailsPage = () => {
   const [quantity, setQuantity] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
+  const [showPurchaseFlow, setShowPurchaseFlow] = useState(false);
 
   // Load event from Laravel API
   useEffect(() => {
@@ -103,12 +105,14 @@ const EventDetailsPage = () => {
       return;
     }
 
-    handleAddToCart();
-    // Navigate to cart after a short delay
-    setTimeout(() => {
-      setShowModal(false);
-      navigate("/cart");
-    }, 1500);
+    setShowPurchaseFlow(true);
+  };
+
+  const handlePurchaseSuccess = (tickets) => {
+    setShowPurchaseFlow(false);
+    setShowModal(true);
+    // Optionally refresh event data to update available tickets
+    // loadEvent();
   };
 
   const handleQuantityChange = (e) => {
@@ -341,6 +345,14 @@ const EventDetailsPage = () => {
           />
         </div>
       </Modal>
+
+      {/* Purchase Flow Modal */}
+      <TicketPurchaseFlow
+        event={event}
+        isOpen={showPurchaseFlow}
+        onClose={() => setShowPurchaseFlow(false)}
+        onSuccess={handlePurchaseSuccess}
+      />
     </div>
   );
 };

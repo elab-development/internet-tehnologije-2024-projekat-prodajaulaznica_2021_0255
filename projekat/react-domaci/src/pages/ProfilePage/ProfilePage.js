@@ -3,6 +3,8 @@ import Button from "../../components/common/Button";
 import "./ProfilePage.css";
 import { useAuth } from "../../context/AuthContext";
 import LogoutButton from "../../components/common/LogoutButton";
+import UserProfile from "../../components/common/UserProfile";
+import PasswordChange from "../../components/common/PasswordChange";
 
 const ProfilePage = () => {
   const { user } = useAuth();
@@ -120,6 +122,13 @@ const ProfilePage = () => {
             </div>
           </div>
         </header>
+
+        {/* --- Novi dodati deo: sekcija za upravljanje korisnicima --- */}
+        {/* User management section */}
+        <section className="user-management-section">
+          <UserProfile />
+          <PasswordChange />
+        </section>
 
         {/* Vremenska prognoza sekcija */}
         <section className="weather-section">

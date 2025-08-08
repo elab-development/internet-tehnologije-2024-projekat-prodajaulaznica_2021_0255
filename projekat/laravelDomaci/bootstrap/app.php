@@ -11,17 +11,19 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
-   ->withMiddleware(function (Middleware $middleware) {
+    ->withMiddleware(function (Middleware $middleware) {
+        // CORS mora biti PRVI u nizu
+        $middleware->api(prepend: [
+            \Illuminate\Http\Middleware\HandleCors::class,
+        ]);
+
+        // Zatim ostali middleware - UKLANJAMO throttle:api privremeno
         $middleware->api([
             \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
-            'throttle:api',
+            // 'throttle:api', // Uklanjamo ovo privremeno
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
         ]);
-        
-        $middleware->api(prepend: [
-             \Illuminate\Http\Middleware\HandleCors::class,
-        ]);
-        
+       
         $middleware->alias([
             'api.response' => \App\Http\Middleware\ApiResponseMiddleware::class,
             'api.errors' => \App\Http\Middleware\ErrorHandlingMiddleware::class,
@@ -30,3 +32,5 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withExceptions(function (Exceptions $exceptions): void {
         //
     })->create();
+
+

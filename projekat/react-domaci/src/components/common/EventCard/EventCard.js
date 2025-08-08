@@ -1,10 +1,12 @@
-// Update EventCard component to handle both old and new data structures
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import QuickPurchase from "../QuickPurchase";
 
 const EventCard = ({ event }) => {
   const navigate = useNavigate();
+
+  // Debug log da vidimo šta dobijamo
+  console.log("EventCard received event:", event);
 
   // Handle both old mock data and new Laravel API data
   const eventData = {
@@ -26,9 +28,44 @@ const EventCard = ({ event }) => {
       event.image ||
       "https://picsum.photos/400/250?random=" + event.id,
     category: event.category?.name || event.category || "Ostalo",
-    availableTickets: event.available_tickets || event.availableTickets || 0,
-    featured: event.featured || false,
+    // Poboljšano mapiranje available_tickets
+    availableTickets: (() => {
+      // Prvo pokušaj event.available_tickets
+      if (
+        typeof event.available_tickets === "number" &&
+        event.available_tickets >= 0
+      ) {
+        return event.available_tickets;
+      }
+      // Zatim pokušaj event.availableTickets
+      if (
+        typeof event.availableTickets === "number" &&
+        event.availableTickets >= 0
+      ) {
+        return event.availableTickets;
+      }
+      // Ako je string, pokušaj da ga konvertuješ
+      if (typeof event.available_tickets === "string") {
+        const parsed = parseInt(event.available_tickets, 10);
+        return !isNaN(parsed) && parsed >= 0 ? parsed : 100; // default 100
+      }
+      if (typeof event.availableTickets === "string") {
+        const parsed = parseInt(event.availableTickets, 10);
+        return !isNaN(parsed) && parsed >= 0 ? parsed : 100; // default 100
+      }
+      // Default vrednost ako ništa nije definisano
+      return 100;
+    })(),
+    featured: event.is_featured || event.featured || false,
   };
+
+  // Debug log za eventData
+  console.log("EventCard processed eventData:", eventData);
+  console.log(
+    "Available tickets:",
+    eventData.availableTickets,
+    typeof eventData.availableTickets
+  );
 
   const formatPrice = (price) => {
     return new Intl.NumberFormat("sr-RS").format(price);
@@ -42,6 +79,11 @@ const EventCard = ({ event }) => {
       month: "long",
       day: "numeric",
     });
+  };
+
+  // Funkcija za određivanje da li su karte dostupne
+  const isAvailable = () => {
+    return eventData.availableTickets > 0;
   };
 
   return (
@@ -117,7 +159,14 @@ const EventCard = ({ event }) => {
             </div>
             <div>📍 {eventData.location}</div>
             <div>🏷️ {eventData.category}</div>
-            <div>🎫 {eventData.availableTickets} dostupno</div>
+            <div
+              style={{
+                color: isAvailable() ? "#28a745" : "#dc3545",
+                fontWeight: "500",
+              }}
+            >
+              🎫 {eventData.availableTickets} dostupno
+            </div>
           </div>
 
           <div
@@ -138,10 +187,9 @@ const EventCard = ({ event }) => {
       <div style={{ padding: "0 1rem 1rem" }}>
         <QuickPurchase
           event={eventData}
-          buttonText={
-            eventData.availableTickets > 0 ? "Kupi karte" : "Rasprodato"
-          }
+          buttonText="Kupi karte"
           size="small"
+          disabled={!isAvailable()} // disabled prop
         />
       </div>
     </div>

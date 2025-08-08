@@ -11,166 +11,122 @@ use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
-    /**
-     * @OA\Tag(
-     *     name="Authentication",
-     *     description="Operations related to user authentication"
-     * )
-     */
-    /**
-     * @OA\Post(
-     *     path="/register",
-     *     summary="Register a new user",
-     *     tags={"Authentication"},
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             required={"name","email","password"},
-     *             @OA\Property(property="name", type="string"),
-     *             @OA\Property(property="email", type="string"),
-     *             @OA\Property(property="password", type="string")
-     *         )
-     *     ),
-     *     @OA\Response(response=201, description="User registered successfully")
-     * )
-     */
     public function register(Request $request)
     {
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255',
-            'password' => 'required|string|min:8',
-        ]);
-        
+        try {
+            $request->validate([
+                'name' => 'required|string|max:255',
+                'email' => 'required|string|email|max:255|unique:users',
+                'password' => 'required|string|min:8|confirmed',
+            ]);
 
-        $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-        ]);
+            $user = User::create([
+                'name' => $request->name,
+                'email' => $request->email,
+                'password' => Hash::make($request->password),
+            ]);
 
-        $token = $user->createToken('auth_token')->plainTextToken;
+            $token = $user->createToken('auth_token')->plainTextToken;
 
-        return response()->json([
-            'message' => 'User registered successfully',
-            'user' => $user,
-            'access_token' => $token,
-            'token_type' => 'Bearer',
-        ], 201);
+            return response()->json([
+                'success' => true,
+                'message' => 'User registered successfully',
+                'data' => [
+                    'user' => $user,
+                    'access_token' => $token,
+                    'token_type' => 'Bearer',
+                ]
+            ], 201);
+
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Registration failed',
+                'data' => null
+            ], 500);
+        }
     }
 
-    /**
-     * @OA\Post(
-     *     path="/login",
-     *     summary="Login user",
-     *     tags={"Authentication"},
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             required={"email","password"},
-     *             @OA\Property(property="email", type="string"),
-     *             @OA\Property(property="password", type="string")
-     *         )
-     *     ),
-     *     @OA\Response(response=200, description="Login successful"),
-     *     @OA\Response(response=401, description="Unauthorized")
-     * )
-     */
     public function login(Request $request)
-{
-    $request->validate([
-        'email' => 'required|email',
-        'password' => 'required',
-    ]);
+    {
+        try {
+            $request->validate([
+                'email' => 'required|email',
+                'password' => 'required',
+            ]);
 
-    if (!Auth::attempt($request->only('email', 'password'))) {
-        return response()->json([
-            'message' => 'Login failed, credentials are wrong!'
-        ], 401);
+            if (!Auth::attempt($request->only('email', 'password'))) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid credentials',
+                    'data' => null
+                ], 401);
+            }
+
+            $user = User::where('email', $request->email)->firstOrFail();
+            $token = $user->createToken('auth_token')->plainTextToken;
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Login successful',
+                'data' => [
+                    'user' => $user,
+                    'access_token' => $token,
+                    'token_type' => 'Bearer',
+                ]
+            ]);
+
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Login failed',
+                'data' => null
+            ], 500);
+        }
     }
 
-    $user = User::where('email', $request->email)->firstOrFail();
-    $token = $user->createToken('auth_token')->plainTextToken;
+    public function logout(Request $request)
+    {
+        try {
+            $request->user()->currentAccessToken()->delete();
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Logged out successfully',
+                'data' => null
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Logout failed',
+                'data' => null
+            ], 500);
+        }
+    }
 
-    return response()->json([
-        'message' => 'Login successful',
-        'user' => $user,
-        'access_token' => $token,
-        'token_type' => 'Bearer',
-        'frontend_url' => $this->getRedirectUrl(),
-    ]);
-}
-/**
-     * @OA\Post(
-     *     path="/logout",
-     *     summary="Logout user",
-     *     tags={"Authentication"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Response(response=200, description="Logged out successfully")
-     * )
-     */
-public function logout(Request $request)
-{
-    try {
-        // Delete current access token
-        $request->user()->currentAccessToken()->delete();
-        
+    public function user(Request $request)
+    {
         return response()->json([
-            'message' => 'Logged out successfully'
+            'success' => true,
+            'message' => 'User data retrieved successfully',
+            'data' => [
+                'user' => $request->user()
+            ]
         ]);
-    } catch (\Exception $e) {
-        return response()->json([
-            'message' => 'Logout failed'
-        ], 500);
-    }
-}
-
-    /**
-     * @OA\Get(
-     *     path="/csrf-token",
-     *     summary="Get CSRF token",
-     *     tags={"Authentication"},
-     *     @OA\Response(response=200, description="CSRF cookie set")
-     * )
-     */
-    public function csrf()
-    {
-        return response()->json(['message' => 'CSRF cookie set']);
     }
 
-    protected function getRedirectUrl()
-    {
-        return config('frontend.url');
-    }
-/**
-     * @OA\Post(
-     * path="/api/refresh-token",
-     * summary="Refreshes the user's access token",
-     * tags={"Auth"},
-     * security={{"bearerAuth":{}}},
-     * @OA\Response(
-     * response=200,
-     * description="Token refreshed successfully",
-     * @OA\JsonContent(
-     * @OA\Property(property="message", type="string", example="Token refreshed successfully"),
-     * @OA\Property(property="user", type="object",
-     * @OA\Property(property="id", type="integer", example=1),
-     * @OA\Property(property="name", type="string", example="John Doe"),
-     * @OA\Property(property="email", type="string", example="john.doe@example.com")
-     * ),
-     * @OA\Property(property="access_token", type="string", example="1|12345abcdefg..."),
-     * @OA\Property(property="token_type", type="string", example="Bearer")
-     * )
-     * ),
-     * @OA\Response(
-     * response=401,
-     * description="Unauthorized",
-     * @OA\JsonContent(
-     * @OA\Property(property="message", type="string", example="Token refresh failed")
-     * )
-     * )
-     * )
-     */
     public function refresh(Request $request)
     {
         try {
@@ -183,49 +139,20 @@ public function logout(Request $request)
             $newToken = $user->createToken('auth_token')->plainTextToken;
             
             return response()->json([
+                'success' => true,
                 'message' => 'Token refreshed successfully',
-                'user' => $user,
-                'access_token' => $newToken,
-                'token_type' => 'Bearer',
+                'data' => [
+                    'user' => $user,
+                    'access_token' => $newToken,
+                    'token_type' => 'Bearer',
+                ]
             ]);
         } catch (\Exception $e) {
             return response()->json([
-                'message' => 'Token refresh failed'
+                'success' => false,
+                'message' => 'Token refresh failed',
+                'data' => null
             ], 401);
         }
-    }
-/**
-     * @OA\Get(
-     * path="/api/user",
-     * summary="Get the authenticated user's details",
-     * tags={"Auth"},
-     * security={{"bearerAuth":{}}},
-     * @OA\Response(
-     * response=200,
-     * description="User data retrieved successfully",
-     * @OA\JsonContent(
-     * @OA\Property(property="message", type="string", example="User data retrieved successfully"),
-     * @OA\Property(property="user", type="object",
-     * @OA\Property(property="id", type="integer", example=1),
-     * @OA\Property(property="name", type="string", example="John Doe"),
-     * @OA\Property(property="email", type="string", example="john.doe@example.com")
-     * )
-     * )
-     * ),
-     * @OA\Response(
-     * response=401,
-     * description="Unauthorized",
-     * @OA\JsonContent(
-     * @OA\Property(property="message", type="string", example="Unauthenticated.")
-     * )
-     * )
-     * )
-     */
-    public function user(Request $request)
-    {
-        return response()->json([
-            'message' => 'User data retrieved successfully',
-            'user' => $request->user()
-        ]);
     }
 }

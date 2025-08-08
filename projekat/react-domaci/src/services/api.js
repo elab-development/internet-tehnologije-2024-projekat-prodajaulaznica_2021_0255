@@ -8,6 +8,7 @@ const api = axios.create({
   headers: {
     Accept: "application/json",
     "Content-Type": "application/json",
+    "X-Requested-With": "XMLHttpRequest", // Dodato za Laravel Sanctum
   },
 });
 
@@ -113,6 +114,7 @@ const refreshToken = async () => {
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: "application/json",
+        "X-Requested-With": "XMLHttpRequest", // Dodato
       },
       withCredentials: true,
     }
@@ -122,9 +124,31 @@ const refreshToken = async () => {
 };
 
 export const apiService = {
+  // Inicijalizacija - pozovite na početku aplikacije
+  init: async () => {
+    try {
+      await axios.get("http://localhost:8000/sanctum/csrf-cookie", {
+        withCredentials: true,
+        headers: {
+          Accept: "application/json",
+          "X-Requested-With": "XMLHttpRequest",
+        },
+      });
+    } catch (error) {
+      console.log("CSRF cookie initialization failed:", error);
+      // Ne bacamo grešku jer ovo nije kritično za osnovnu funkcionalnost
+    }
+  },
+
   // Authentication
   getCsrfCookie: async () => {
-    return await api.get("/csrf-cookie");
+    return await axios.get("http://localhost:8000/sanctum/csrf-cookie", {
+      withCredentials: true,
+      headers: {
+        Accept: "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+      },
+    });
   },
 
   register: async (userData) => {
@@ -143,7 +167,6 @@ export const apiService = {
     return await refreshToken();
   },
 
-  // Check if token is valid
   checkAuth: async () => {
     return await api.get("/user");
   },
@@ -175,8 +198,20 @@ export const apiService = {
   },
 
   getFeaturedEvents: async () => {
-    const response = await api.get("/events?featured=true");
-    return { data: response.data || [] };
+    try {
+      const response = await api.get("/events?featured=true");
+      return {
+        success: true,
+        data: response.data || [],
+        message: "Featured events retrieved successfully",
+      };
+    } catch (error) {
+      return {
+        success: false,
+        data: [],
+        message: error.message || "Error fetching featured events",
+      };
+    }
   },
 
   createEvent: async (eventData) => {
@@ -307,11 +342,7 @@ export const apiService = {
     return await api.get(`/categories/${categoryId}/statistics`);
   },
 
-  // Ticket cancellation
-  cancelTicket: async (ticketId, data = {}) => {
-    return await api.patch(`/tickets/${ticketId}/cancel`, data);
-  },
-
+  // Ticket cancellation - uklonjena dupla definicija
   getCancellationPolicy: async (eventId) => {
     return await api.get(`/events/${eventId}/cancellation-policy`);
   },
@@ -329,20 +360,7 @@ export const apiService = {
     return await api.post("/tickets/validate-qr", { qr_data: qrData });
   },
 
-  // Ticket validation interface
-  getEventValidationStats: async (eventId) => {
-    return await api.get(`/events/${eventId}/validation-stats`);
-  },
-
-  validateBulkTickets: async (ticketNumbers) => {
-    return await api.post("/tickets/validate/bulk", {
-      ticket_numbers: ticketNumbers,
-    });
-  },
-
-  markTicketAsUsed: async (ticketId) => {
-    return await api.patch(`/tickets/${ticketId}/use`);
-  },
+  // Uklonjena dupla definicija getEventValidationStats i validateBulkTickets i markTicketAsUsed
 
   generateReceipt: async (ticketId) => {
     return await api.get(`/tickets/${ticketId}/receipt`);
@@ -355,6 +373,7 @@ export const apiService = {
       },
     });
   },
+
   // Admin Dashboard
   getAdminOverview: async () => {
     return await api.get("/admin/dashboard/overview");

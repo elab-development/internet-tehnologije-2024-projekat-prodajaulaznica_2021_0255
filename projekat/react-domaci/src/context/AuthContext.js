@@ -43,9 +43,7 @@ export const AuthProvider = ({ children }) => {
     try {
       setLoading(true);
 
-      // Get CSRF cookie first
-      await apiService.getCsrfCookie();
-
+      // Uklonili smo getCsrfCookie poziv
       const response = await apiService.login(credentials);
 
       if (response.success) {
@@ -79,8 +77,7 @@ export const AuthProvider = ({ children }) => {
     try {
       setLoading(true);
 
-      await apiService.getCsrfCookie();
-
+      // Uklonili smo getCsrfCookie poziv
       const response = await apiService.register(userData);
 
       if (response.success) {
@@ -111,41 +108,29 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Ostatak koda ostaje isti...
   const logout = async () => {
     try {
       setLoading(true);
 
       if (token) {
-        // Call Laravel logout endpoint
         await apiService.logout();
       }
     } catch (error) {
       console.error("Logout error:", error);
-      // Continue with logout even if API call fails
     } finally {
-      // Clear all auth data
       clearAuthData();
       setLoading(false);
-
-      // Redirect to home page
       window.location.href = "/";
     }
   };
 
-  // Forced logout (when token expires)
-  const forceLogout = () => {
-    clearAuthData();
-    window.location.href = "/login";
-  };
-
-  // Handle token refresh
   const checkAuthStatus = async () => {
     if (!token) return false;
 
     try {
       const response = await apiService.checkAuth();
       if (response.success) {
-        // Update user data if needed
         if (response.data.user) {
           updateUser(response.data.user);
         }
@@ -164,10 +149,8 @@ export const AuthProvider = ({ children }) => {
     return !!(user && token);
   };
 
-  // Periodic auth check
   useEffect(() => {
     if (isAuthenticated()) {
-      // Check auth status every 10 minutes
       const interval = setInterval(() => {
         checkAuthStatus();
       }, 10 * 60 * 1000);
@@ -205,7 +188,6 @@ export const AuthProvider = ({ children }) => {
     clearAuthData,
   };
 
-  // Don't render children until auth is initialized
   if (!isInitialized) {
     return (
       <div

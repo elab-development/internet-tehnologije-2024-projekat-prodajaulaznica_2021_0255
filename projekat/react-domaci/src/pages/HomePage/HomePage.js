@@ -12,14 +12,47 @@ const HomePage = () => {
     const loadFeaturedEvents = async () => {
       try {
         setLoading(true);
-        const response = await apiService.getFeaturedEvents();
+        console.log("🔄 Pozivam getFeaturedEvents...");
 
-        if (response.success) {
-          setFeaturedEvents(response.data || []);
+        const response = await apiService.getFeaturedEvents();
+        console.log("📦 Raw response:", response);
+
+        let eventsArray = [];
+
+        // Pokušajmo da izvučemo niz iz različitih struktura
+        if (response?.success && Array.isArray(response?.data)) {
+          eventsArray = response.data;
+        } else if (Array.isArray(response?.data)) {
+          eventsArray = response.data;
+        } else if (Array.isArray(response)) {
+          eventsArray = response;
+        } else if (response?.data?.data && Array.isArray(response.data.data)) {
+          // Možda je struktura response.data.data
+          eventsArray = response.data.data;
+        } else if (
+          response?.data &&
+          typeof response.data === "object" &&
+          response.data.data
+        ) {
+          // Ili možda response.data.data
+          eventsArray = Array.isArray(response.data.data)
+            ? response.data.data
+            : [];
         } else {
-          setError("Greška pri učitavanju događaja");
+          console.log("❌ Unexpected response format:", response);
+          eventsArray = [];
+        }
+
+        console.log("✅ Final eventsArray:", eventsArray);
+        console.log("✅ Is array:", Array.isArray(eventsArray));
+
+        setFeaturedEvents(eventsArray);
+
+        if (eventsArray.length === 0) {
+          setError("Nema dostupnih popularnih događaja");
         }
       } catch (err) {
+        console.error("❌ Featured events error:", err);
         setError(err.message || "Greška pri učitavanju događaja");
       } finally {
         setLoading(false);
@@ -28,6 +61,9 @@ const HomePage = () => {
 
     loadFeaturedEvents();
   }, []);
+
+  console.log("🎯 Current featuredEvents state:", featuredEvents);
+  console.log("🎯 Is featuredEvents array:", Array.isArray(featuredEvents));
 
   if (loading) {
     return (
@@ -65,7 +101,9 @@ const HomePage = () => {
 
       <section style={{ padding: "2rem" }}>
         <h2>Popularni događaji</h2>
-        {featuredEvents.length > 0 ? (
+
+        {/* Bezbedna provera za niz */}
+        {Array.isArray(featuredEvents) && featuredEvents.length > 0 ? (
           <div
             className="events-grid"
             style={{
@@ -75,9 +113,10 @@ const HomePage = () => {
               marginTop: "1rem",
             }}
           >
-            {featuredEvents.map((event) => (
-              <EventCard key={event.id} event={event} />
-            ))}
+            {featuredEvents.map((event, index) => {
+              console.log(`🎪 Rendering event ${index}:`, event);
+              return <EventCard key={event.id || index} event={event} />;
+            })}
           </div>
         ) : (
           <div style={{ textAlign: "center", padding: "2rem", color: "#666" }}>

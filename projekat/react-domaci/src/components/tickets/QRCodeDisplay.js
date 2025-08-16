@@ -23,204 +23,138 @@ const QRCodeDisplay = ({ ticket, isOpen, onClose }) => {
       const response = await apiService.getTicketQRCode(ticket.id);
 
       if (response.success) {
+        console.log("CELA RESPONSE:", response); // DEBUG
+        console.log("QR SVG TIP:", typeof response.data.qr_code_svg); // DEBUG
+        console.log("QR SVG SADRŽAJ:", response.data.qr_code_svg); // DEBUG
+        console.log("QR SVG DUŽINA:", response.data.qr_code_svg?.length); // DEBUG
         setQrCodeData(response.data);
       } else {
         setError("Greška pri učitavanju QR koda");
       }
     } catch (err) {
+      console.error("QR Code Error:", err);
       setError(err.message || "Greška pri učitavanju QR koda");
     } finally {
       setLoading(false);
     }
   };
 
+  const testDirectSVG = () => {
+    const testSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+      <rect width="200" height="200" fill="white" stroke="black" stroke-width="2"/>
+      <rect x="20" y="20" width="20" height="20" fill="black"/>
+      <rect x="60" y="20" width="20" height="20" fill="black"/>
+      <rect x="100" y="20" width="20" height="20" fill="black"/>
+      <rect x="140" y="20" width="20" height="20" fill="black"/>
+      <rect x="20" y="60" width="20" height="20" fill="black"/>
+      <rect x="140" y="60" width="20" height="20" fill="black"/>
+      <rect x="20" y="100" width="20" height="20" fill="black"/>
+      <rect x="60" y="100" width="20" height="20" fill="black"/>
+      <rect x="100" y="100" width="20" height="20" fill="black"/>
+      <rect x="140" y="100" width="20" height="20" fill="black"/>
+      <rect x="20" y="140" width="20" height="20" fill="black"/>
+      <rect x="140" y="140" width="20" height="20" fill="black"/>
+      <text x="100" y="180" text-anchor="middle" fill="black" font-size="12">TEST QR</text>
+    </svg>`;
+
+    console.log("TEST SVG:", testSVG);
+    setQrCodeData({ qr_code_svg: testSVG });
+  };
+
   const handleDownloadQR = () => {
-    if (qrCodeData?.qr_code_url) {
+    if (!qrCodeData?.qr_code_svg) {
+      alert("QR kod nije dostupan za preuzimanje");
+      return;
+    }
+
+    try {
+      // Kreiranje SVG fajla za download
+      const svgBlob = new Blob([qrCodeData.qr_code_svg], {
+        type: "image/svg+xml;charset=utf-8",
+      });
+      const url = URL.createObjectURL(svgBlob);
+
       const link = document.createElement("a");
-      link.href = qrCodeData.qr_code_url;
-      link.download = `ticket-qr-${ticket.ticket_number}.png`;
+      link.href = url;
+      link.download = `qr-code-${ticket.ticket_number}.svg`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-    }
-  };
-
-  const handleDownloadPDF = async () => {
-    try {
-      const response = await apiService.generateTicketPDF(ticket.id);
-
-      if (response.success) {
-        // Generate PDF on frontend using the ticket data
-        generatePDFFromData(response.data);
-      }
+      URL.revokeObjectURL(url);
     } catch (err) {
-      alert("Greška pri generisanju PDF-a: " + err.message);
+      alert("Greška pri preuzimanju: " + err.message);
     }
   };
 
-  const generatePDFFromData = (ticketData) => {
-    // Simple HTML-based PDF generation
-    const printWindow = window.open("", "_blank");
-    const htmlContent = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>Karta - ${ticketData.ticket_number}</title>
-                <style>
-                    body { 
-                        font-family: Arial, sans-serif; 
-                        max-width: 600px; 
-                        margin: 0 auto; 
-                        padding: 20px;
-                        background: white;
-                    }
-                    .ticket {
-                        border: 2px solid #333;
-                        border-radius: 10px;
-                        padding: 20px;
-                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                        color: white;
-                        margin-bottom: 20px;
-                    }
-                    .ticket-header {
-                        text-align: center;
-                        border-bottom: 1px solid rgba(255,255,255,0.3);
-                        padding-bottom: 15px;
-                        margin-bottom: 15px;
-                    }
-                    .ticket-number {
-                        font-size: 24px;
-                        font-weight: bold;
-                        letter-spacing: 2px;
-                        margin-bottom: 10px;
-                    }
-                    .event-info {
-                        display: grid;
-                        grid-template-columns: 1fr 1fr;
-                        gap: 15px;
-                        margin-bottom: 20px;
-                    }
-                    .info-item {
-                        margin-bottom: 10px;
-                    }
-                    .info-label {
-                        font-weight: bold;
-                        margin-bottom: 5px;
-                    }
-                    .qr-section {
-                        text-align: center;
-                        background: white;
-                        color: #333;
-                        padding: 20px;
-                        border-radius: 8px;
-                        margin-top: 20px;
-                    }
-                    .qr-code {
-                        max-width: 200px;
-                        height: auto;
-                        margin: 10px 0;
-                    }
-                    .footer {
-                        text-align: center;
-                        margin-top: 20px;
-                        font-size: 12px;
-                        color: #666;
-                    }
-                    @media print {
-                        body { margin: 0; }
-                        .no-print { display: none; }
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="ticket">
-                    <div class="ticket-header">
-                        <div class="ticket-number">${ticketData.ticket_number}</div>
-                        <div>ELEKTRONSKA KARTA</div>
-                    </div>
-                    
-                    <div class="event-info">
-                        <div class="info-item">
-                            <div class="info-label">DOGAĐAJ:</div>
-                            <div>${ticketData.event.name}</div>
-                        </div>
-                        <div class="info-item">
-                            <div class="info-label">KATEGORIJA:</div>
-                            <div>${ticketData.event.category}</div>
-                        </div>
-                        <div class="info-item">
-                            <div class="info-label">DATUM:</div>
-                            <div>${ticketData.event.date}</div>
-                        </div>
-                        <div class="info-item">
-                            <div class="info-label">VREME:</div>
-                            <div>${ticketData.event.time}</div>
-                        </div>
-                        <div class="info-item">
-                            <div class="info-label">LOKACIJA:</div>
-                            <div>${ticketData.event.location}</div>
-                        </div>
-                        <div class="info-item">
-                            <div class="info-label">CENA:</div>
-                            <div>${ticketData.price} RSD</div>
-                        </div>
-                        <div class="info-item">
-                            <div class="info-label">VLASNIK:</div>
-                            <div>${ticketData.user.name}</div>
-                        </div>
-                        <div class="info-item">
-                            <div class="info-label">EMAIL:</div>
-                            <div>${ticketData.user.email}</div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="qr-section">
-                    <div style="font-weight: bold; margin-bottom: 10px;">
-                        POKAŽITE OVAJ KOD NA ULAZU
-                    </div>
-                    <img src="${qrCodeData?.qr_code_url}" alt="QR Code" class="qr-code" />
-                    <div style="font-size: 12px; margin-top: 10px;">
-                        Skenirajte QR kod ili pokažite broj karte: ${ticketData.ticket_number}
-                    </div>
-                </div>
-                
-                <div class="footer">
-                    <div>Karta kupljena: ${ticketData.purchase_date}</div>
-                    <div>Status: ${ticketData.status}</div>
-                    <div style="margin-top: 10px;">
-                        <strong>NAPOMENE:</strong><br>
-                        • Karta je važeća samo sa važećim ličnim dokumentom<br>
-                        • Zabranjeno je fotografisanje i snimanje bez dozvole<br>
-                        • Organizator zadržava pravo promene programa
-                    </div>
-                </div>
-                
-                <div class="no-print" style="text-align: center; margin-top: 30px;">
-                    <button onclick="window.print()" style="
-                        background: #007bff;
-                        color: white;
-                        border: none;
-                        padding: 10px 20px;
-                        border-radius: 5px;
-                        cursor: pointer;
-                        margin-right: 10px;
-                    ">Štampaj</button>
-                    <button onclick="window.close()" style="
-                        background: #6c757d;
-                        color: white;
-                        border: none;
-                        padding: 10px 20px;
-                        border-radius: 5px;
-                        cursor: pointer;
-                    ">Zatvori</button>
-                </div>
-            </body>
-            </html>
-        `;
+  const handlePrintQR = () => {
+    if (!qrCodeData?.qr_code_svg) {
+      alert("QR kod nije dostupan za štampanje");
+      return;
+    }
 
-    printWindow.document.write(htmlContent);
-    printWindow.document.close();
+    try {
+      const printWindow = window.open("", "_blank");
+
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>QR kod - ${ticket?.ticket_number}</title>
+            <style>
+              body { 
+                font-family: Arial, sans-serif; 
+                text-align: center; 
+                padding: 2rem;
+                margin: 0;
+              }
+              .qr-container { 
+                border: 2px dashed #333; 
+                padding: 2rem; 
+                margin: 2rem auto;
+                max-width: 400px;
+                background: white;
+              }
+              .ticket-info {
+                margin-bottom: 2rem;
+                font-size: 14px;
+                line-height: 1.6;
+              }
+              @media print {
+                body { margin: 0; padding: 1rem; }
+                .no-print { display: none; }
+              }
+            </style>
+          </head>
+          <body>
+            <h2>Elektronska karta</h2>
+            <div class="ticket-info">
+              <strong>Broj karte:</strong> ${ticket?.ticket_number}<br>
+              <strong>Događaj:</strong> ${ticket?.event?.name}<br>
+              <strong>Datum:</strong> ${formatDate(
+                ticket?.event?.start_date
+              )}<br>
+              <strong>Lokacija:</strong> ${ticket?.event?.location}
+            </div>
+            <div class="qr-container">
+              ${qrCodeData.qr_code_svg}
+            </div>
+            <p><strong>Pokažite ovaj QR kod na ulazu</strong></p>
+            <div class="no-print" style="margin-top: 2rem;">
+              <button onclick="window.print()" style="
+                background: #007bff; color: white; border: none; 
+                padding: 10px 20px; border-radius: 5px; cursor: pointer; margin-right: 10px;
+              ">Štampaj</button>
+              <button onclick="window.close()" style="
+                background: #6c757d; color: white; border: none; 
+                padding: 10px 20px; border-radius: 5px; cursor: pointer;
+              ">Zatvori</button>
+            </div>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+    } catch (err) {
+      alert("Greška pri štampanju: " + err.message);
+    }
   };
 
   const formatDate = (dateString) => {
@@ -231,6 +165,17 @@ const QRCodeDisplay = ({ ticket, isOpen, onClose }) => {
       hour: "2-digit",
       minute: "2-digit",
     });
+  };
+
+  // SIGURNA FUNKCIJA ZA PROVERU STRINGA
+  const isValidString = (value) => {
+    return value && typeof value === "string" && value.length > 0;
+  };
+
+  const getStringValue = (value) => {
+    if (typeof value === "string") return value;
+    if (value && typeof value === "object") return JSON.stringify(value);
+    return String(value || "");
   };
 
   if (!ticket) return null;
@@ -256,7 +201,7 @@ const QRCodeDisplay = ({ ticket, isOpen, onClose }) => {
               marginBottom: "1rem",
             }}
           >
-            {error}
+            ⚠️ {error}
             <Button
               variant="outline"
               size="small"
@@ -270,6 +215,43 @@ const QRCodeDisplay = ({ ticket, isOpen, onClose }) => {
 
         {qrCodeData && !loading && (
           <div>
+            {/* Debug info - SIGURNO */}
+            <div
+              style={{
+                fontSize: "0.75rem",
+                color: "#666",
+                marginBottom: "1rem",
+                backgroundColor: "#f0f0f0",
+                padding: "0.5rem",
+                borderRadius: "4px",
+                textAlign: "left",
+              }}
+            >
+              <strong>DEBUG INFO:</strong>
+              <br />
+              QR SVG tip: {typeof qrCodeData.qr_code_svg}
+              <br />
+              QR SVG dužina: {qrCodeData.qr_code_svg?.length || 0} karaktera
+              <br />
+              Je string: {isValidString(qrCodeData.qr_code_svg) ? "DA" : "NE"}
+              <br />
+              Počinje sa SVG:{" "}
+              {isValidString(qrCodeData.qr_code_svg) &&
+              qrCodeData.qr_code_svg.startsWith("<svg")
+                ? "DA"
+                : "NE"}
+              <br />
+              Prva 50 karaktera:{" "}
+              {getStringValue(qrCodeData.qr_code_svg).substring(0, 50)}...
+            </div>
+
+            {/* Test dugme */}
+            <div style={{ marginBottom: "1rem" }}>
+              <Button variant="outline" size="small" onClick={testDirectSVG}>
+                🧪 Test SVG
+              </Button>
+            </div>
+
             {/* Ticket info */}
             <div
               style={{
@@ -277,9 +259,12 @@ const QRCodeDisplay = ({ ticket, isOpen, onClose }) => {
                 padding: "1rem",
                 borderRadius: "8px",
                 marginBottom: "2rem",
+                textAlign: "left",
               }}
             >
-              <h4>{ticket.event?.name}</h4>
+              <h4 style={{ textAlign: "center", marginBottom: "1rem" }}>
+                📋 {ticket.event?.name}
+              </h4>
               <div style={{ fontSize: "0.875rem", color: "#6c757d" }}>
                 <div>📅 {formatDate(ticket.event?.start_date)}</div>
                 <div>📍 {ticket.event?.location}</div>
@@ -291,25 +276,78 @@ const QRCodeDisplay = ({ ticket, isOpen, onClose }) => {
             <div
               style={{
                 backgroundColor: "white",
-                border: "2px dashed #dee2e6",
-                borderRadius: "8px",
+                border: "3px dashed #dee2e6",
+                borderRadius: "12px",
                 padding: "2rem",
                 marginBottom: "2rem",
               }}
             >
               <div style={{ marginBottom: "1rem", fontWeight: "bold" }}>
-                POKAŽITE OVAJ KOD NA ULAZU
+                📱 POKAŽITE OVAJ KOD NA ULAZU
               </div>
 
-              <img
-                src={qrCodeData.qr_code_url}
-                alt="QR Code"
-                style={{
-                  maxWidth: "250px",
-                  height: "auto",
-                  border: "1px solid #dee2e6",
-                }}
-              />
+              {/* QR Code Display sa sigurnim proverama */}
+              {qrCodeData.qr_code_svg ? (
+                <div>
+                  {isValidString(qrCodeData.qr_code_svg) ? (
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        minHeight: "250px",
+                        border: "1px solid #eee",
+                        borderRadius: "8px",
+                        backgroundColor: "#fff",
+                      }}
+                      dangerouslySetInnerHTML={{
+                        __html: qrCodeData.qr_code_svg,
+                      }}
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        minHeight: "250px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        border: "2px solid red",
+                        borderRadius: "8px",
+                        color: "red",
+                        flexDirection: "column",
+                        padding: "1rem",
+                      }}
+                    >
+                      <div>
+                        <strong>GREŠKA: QR kod nije valjan string!</strong>
+                      </div>
+                      <div>Tip: {typeof qrCodeData.qr_code_svg}</div>
+                      <div>
+                        Vrednost:{" "}
+                        {getStringValue(qrCodeData.qr_code_svg).substring(
+                          0,
+                          100
+                        )}
+                        ...
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div
+                  style={{
+                    minHeight: "250px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    border: "2px dashed #ccc",
+                    borderRadius: "8px",
+                    color: "#666",
+                  }}
+                >
+                  QR kod nije dostupan (prazan)
+                </div>
+              )}
 
               <div
                 style={{
@@ -318,9 +356,35 @@ const QRCodeDisplay = ({ ticket, isOpen, onClose }) => {
                   marginTop: "1rem",
                 }}
               >
-                Skenirajte QR kod ili pokažite broj karte
+                Broj karte: <strong>{ticket.ticket_number}</strong>
               </div>
             </div>
+
+            {/* Raw data prikaz */}
+            <details style={{ marginBottom: "2rem", textAlign: "left" }}>
+              <summary style={{ cursor: "pointer", fontWeight: "500" }}>
+                🔍 Sirovi podaci (za debug)
+              </summary>
+              <div
+                style={{
+                  backgroundColor: "#f8fafc",
+                  padding: "1rem",
+                  borderRadius: "6px",
+                  fontSize: "0.75rem",
+                  fontFamily: "monospace",
+                  overflow: "auto",
+                  maxHeight: "300px",
+                  border: "1px solid #e2e8f0",
+                  marginTop: "0.5rem",
+                }}
+              >
+                <strong>QR Code Data:</strong>
+                <br />
+                <pre style={{ margin: 0, whiteSpace: "pre-wrap" }}>
+                  {JSON.stringify(qrCodeData, null, 2)}
+                </pre>
+              </div>
+            </details>
 
             {/* Action buttons */}
             <div
@@ -329,14 +393,15 @@ const QRCodeDisplay = ({ ticket, isOpen, onClose }) => {
                 gap: "1rem",
                 justifyContent: "center",
                 flexWrap: "wrap",
+                marginBottom: "2rem",
               }}
             >
               <Button variant="outline" onClick={handleDownloadQR}>
-                📥 Preuzmi QR kod
+                📥 Preuzmi SVG
               </Button>
 
-              <Button variant="outline" onClick={handleDownloadPDF}>
-                📄 Preuzmi PDF
+              <Button variant="outline" onClick={handlePrintQR}>
+                🖨️ Štampaj
               </Button>
 
               <Button onClick={onClose}>Zatvori</Button>
@@ -345,25 +410,18 @@ const QRCodeDisplay = ({ ticket, isOpen, onClose }) => {
             {/* Instructions */}
             <div
               style={{
-                backgroundColor: "#d1ecf1",
-                border: "1px solid #bee5eb",
-                borderRadius: "4px",
+                backgroundColor: "#e3f2fd",
+                border: "1px solid #2196f3",
+                borderRadius: "8px",
                 padding: "1rem",
-                marginTop: "2rem",
                 fontSize: "0.875rem",
+                textAlign: "left",
               }}
             >
-              <strong>Napomene:</strong>
-              <ul
-                style={{
-                  margin: "0.5rem 0",
-                  paddingLeft: "1.5rem",
-                  textAlign: "left",
-                }}
-              >
-                <li>Sačuvajte QR kod na telefonu ili štampajte kartu</li>
-                <li>QR kod je jedinstven za vašu kartu</li>
-                <li>Pokažite kod na ulazu u događaj</li>
+              <strong>💡 Napomene:</strong>
+              <ul style={{ margin: "0.5rem 0", paddingLeft: "1.5rem" }}>
+                <li>QR kod sadrži sve podatke o vašoj karti</li>
+                <li>Pokažite kod na ulazu - može se skenirati sa ekrana</li>
                 <li>Ponesitе važeći lični dokument</li>
               </ul>
             </div>

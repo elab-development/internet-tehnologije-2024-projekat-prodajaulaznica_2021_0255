@@ -12,6 +12,7 @@ class Ticket extends Model
         'ticket_number',
         'qr_code',
         'qr_code_path',
+        'qr_code_svg',
         'price',
         'discount_percentage',
         'status',

@@ -16,11 +16,18 @@ const TicketsPage = () => {
           padding: "3rem",
           maxWidth: "600px",
           margin: "0 auto",
+          backgroundColor: "white",
+          borderRadius: "12px",
+          boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
         }}
       >
-        <h2>Prijavite se za pristup kartama</h2>
-        <p style={{ marginBottom: "2rem", color: "#666" }}>
-          Da biste videli svoje karte, morate biti prijavljeni.
+        <div style={{ fontSize: "4rem", marginBottom: "1rem" }}>🎫</div>
+        <h2 style={{ marginBottom: "1rem", color: "#333" }}>
+          Prijavite se za pristup kartama
+        </h2>
+        <p style={{ marginBottom: "2rem", color: "#666", lineHeight: "1.6" }}>
+          Da biste videli svoje karte, upravljali njima i pristupili QR
+          kodovima, morate biti prijavljeni na svoj nalog.
         </p>
         <div style={{ display: "flex", gap: "1rem", justifyContent: "center" }}>
           <Button onClick={() => navigate("/login")}>Prijavite se</Button>

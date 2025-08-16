@@ -8,7 +8,7 @@ const api = axios.create({
   headers: {
     Accept: "application/json",
     "Content-Type": "application/json",
-    "X-Requested-With": "XMLHttpRequest", // Dodato za Laravel Sanctum
+    "X-Requested-With": "XMLHttpRequest",
   },
 });
 
@@ -52,7 +52,6 @@ api.interceptors.response.use(
 
     if (error.response?.status === 401 && !originalRequest._retry) {
       if (isRefreshing) {
-        // If already refreshing, queue the request
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
         })
@@ -69,20 +68,17 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        // Attempt to refresh token
         const refreshResponse = await refreshToken();
         const newToken = refreshResponse.access_token;
 
         localStorage.setItem("auth_token", newToken);
         processQueue(null, newToken);
 
-        // Retry original request with new token
         originalRequest.headers.Authorization = `Bearer ${newToken}`;
         return api(originalRequest);
       } catch (refreshError) {
         processQueue(refreshError, null);
 
-        // Refresh failed, clear auth data and redirect
         localStorage.removeItem("auth_token");
         localStorage.removeItem("user");
 
@@ -114,7 +110,7 @@ const refreshToken = async () => {
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: "application/json",
-        "X-Requested-With": "XMLHttpRequest", // Dodato
+        "X-Requested-With": "XMLHttpRequest",
       },
       withCredentials: true,
     }
@@ -124,7 +120,7 @@ const refreshToken = async () => {
 };
 
 export const apiService = {
-  // Inicijalizacija - pozovite na početku aplikacije
+  // Inicijalizacija
   init: async () => {
     try {
       await axios.get("http://localhost:8000/sanctum/csrf-cookie", {
@@ -136,7 +132,6 @@ export const apiService = {
       });
     } catch (error) {
       console.log("CSRF cookie initialization failed:", error);
-      // Ne bacamo grešku jer ovo nije kritično za osnovnu funkcionalnost
     }
   },
 
@@ -171,12 +166,11 @@ export const apiService = {
     return await api.get("/user");
   },
 
-  // Laravel paginated events
+  // Events
   getEventsPaginated: async (queryString = "") => {
     return await api.get(`/events?${queryString}`);
   },
 
-  // Updated existing getEvents to work with Laravel pagination
   getEvents: async (page = 1, limit = 6) => {
     const params = new URLSearchParams();
     params.append("page", page);
@@ -226,6 +220,7 @@ export const apiService = {
     return await api.delete(`/events/${id}`);
   },
 
+  // Categories
   getCategories: async () => {
     return await api.get("/categories");
   },
@@ -246,11 +241,11 @@ export const apiService = {
     return await api.delete(`/categories/${id}`);
   },
 
+  // Tickets
   purchaseTicket: async (ticketData) => {
     return await api.post("/tickets/purchase", ticketData);
   },
 
-  // Enhanced ticket management with filters support
   getMyTickets: async (filters = {}) => {
     const params = new URLSearchParams();
 
@@ -263,16 +258,12 @@ export const apiService = {
     return await api.get(`/tickets/my?${params.toString()}`);
   },
 
-  // New ticket statistics endpoint
   getTicketStats: async () => {
     return await api.get("/tickets/stats");
   },
 
-  // New ticket download functionality
   downloadTicket: async (ticketId) => {
-    return await api.get(`/tickets/${ticketId}/download`, {
-      responseType: "blob",
-    });
+    return await api.get(`/tickets/${ticketId}/download`);
   },
 
   getTicketById: async (id) => {
@@ -280,7 +271,7 @@ export const apiService = {
   },
 
   cancelTicket: async (id) => {
-    return await api.patch(`/tickets/${id}/cancel`);
+    return await api.put(`/tickets/${id}/cancel`);
   },
 
   // Ticket validation methods
@@ -295,35 +286,28 @@ export const apiService = {
   },
 
   markTicketAsUsed: async (ticketId) => {
-    return await api.patch(`/tickets/${ticketId}/use`);
+    return await api.put(`/tickets/${ticketId}/mark-used`);
   },
 
   getEventValidationStats: async (eventId) => {
     return await api.get(`/events/${eventId}/validation-stats`);
   },
 
-  // Discount validation (placeholder)
-  validateDiscount: async (code) => {
-    // Simulate discount validation
-    await new Promise((resolve) => setTimeout(resolve, 500));
+  // QR Code management
+  getTicketQRCode: async (ticketId) => {
+    return await api.get(`/tickets/${ticketId}/qr-code`);
+  },
 
-    const validCodes = {
-      STUDENT10: { percentage: 10, description: "Student popust" },
-      EARLY20: { percentage: 20, description: "Rani popust" },
-      VIP15: { percentage: 15, description: "VIP popust" },
-    };
+  generateTicketPDF: async (ticketId) => {
+    return await api.get(`/tickets/${ticketId}/pdf`);
+  },
 
-    if (validCodes[code.toUpperCase()]) {
-      return {
-        success: true,
-        data: validCodes[code.toUpperCase()],
-      };
-    }
+  validateQRCode: async (qrData) => {
+    return await api.post("/tickets/validate/qr-code", { qr_data: qrData });
+  },
 
-    return {
-      success: false,
-      message: "Neispravni kod za popust",
-    };
+  generateReceipt: async (ticketId) => {
+    return await api.get(`/tickets/${ticketId}/receipt`);
   },
 
   // Search suggestions
@@ -342,28 +326,8 @@ export const apiService = {
     return await api.get(`/categories/${categoryId}/statistics`);
   },
 
-  // Ticket cancellation - uklonjena dupla definicija
   getCancellationPolicy: async (eventId) => {
     return await api.get(`/events/${eventId}/cancellation-policy`);
-  },
-
-  // QR Code management
-  getTicketQRCode: async (ticketId) => {
-    return await api.get(`/tickets/${ticketId}/qr-code`);
-  },
-
-  generateTicketPDF: async (ticketId) => {
-    return await api.get(`/tickets/${ticketId}/pdf`);
-  },
-
-  validateQRCode: async (qrData) => {
-    return await api.post("/tickets/validate-qr", { qr_data: qrData });
-  },
-
-  // Uklonjena dupla definicija getEventValidationStats i validateBulkTickets i markTicketAsUsed
-
-  generateReceipt: async (ticketId) => {
-    return await api.get(`/tickets/${ticketId}/receipt`);
   },
 
   uploadEventImage: async (formData) => {
@@ -418,6 +382,45 @@ export const apiService = {
       responseType: "blob",
     });
     return response;
+  },
+
+  // Purchase history and summary
+  exportPurchaseHistory: async (filters = {}) => {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value) params.append(key, value);
+    });
+
+    return await api.get(
+      `/tickets/purchase-history/export?${params.toString()}`
+    );
+  },
+
+  getPurchaseSummary: async (period = "last_year") => {
+    return await api.get(`/tickets/purchase-summary?period=${period}`);
+  },
+
+  // Discount validation
+  validateDiscount: async (code) => {
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    const validCodes = {
+      STUDENT10: { percentage: 10, description: "Student popust" },
+      EARLY20: { percentage: 20, description: "Rani popust" },
+      VIP15: { percentage: 15, description: "VIP popust" },
+    };
+
+    if (validCodes[code.toUpperCase()]) {
+      return {
+        success: true,
+        data: validCodes[code.toUpperCase()],
+      };
+    }
+
+    return {
+      success: false,
+      message: "Neispravni kod za popust",
+    };
   },
 };
 

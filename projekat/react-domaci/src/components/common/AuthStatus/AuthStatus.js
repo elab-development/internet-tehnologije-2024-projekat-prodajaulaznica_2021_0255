@@ -32,7 +32,7 @@ const AuthStatus = () => {
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-      <span style={{ color: "#666" }}>Dobrodošli, {user?.name}</span>
+      <span style={{ color: "#e3e3e3ff" }}>Dobrodošli, {user?.name}</span>
       <Button
         variant="outline"
         size="small"

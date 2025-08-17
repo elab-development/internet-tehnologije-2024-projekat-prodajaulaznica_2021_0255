@@ -1,25 +1,21 @@
 import React, { useContext } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { CartContext } from "../../context/CartContext";
-import { useAuth } from "../../context/AuthContext"; // Import the useAuth hook
+import { useAuth } from "../../context/AuthContext";
 import AuthStatus from "../common/AuthStatus/AuthStatus";
 import "./Header.css";
 
 const Header = () => {
-  // Use a constant for the app title to avoid repeating the string
   const APP_TITLE = "🎫 TicketMaster Pro";
-  // Use the useContext hook to get cart items
   const { cartItems } = useContext(CartContext);
-  // Use the useLocation hook to determine the current path for active links
   const location = useLocation();
-  // Use the useAuth hook to get the isAdmin and isAuthenticated functions
   const { isAdmin, isAuthenticated } = useAuth();
-  // Calculate the total number of items in the cart
+
   const cartItemsCount = cartItems.reduce(
     (total, item) => total + item.quantity,
     0
   );
-  // Helper function to determine if a link is the active one
+
   const isActive = (path) => {
     return location.pathname === path ? "nav-link active" : "nav-link";
   };
@@ -27,73 +23,52 @@ const Header = () => {
   return (
     <header className="header">
       <div className="header-container">
-        {/* Logo and app title link */}
         <Link to="/" className="logo">
           <h1>{APP_TITLE}</h1>
         </Link>
-        {/* Navigation links */}
-        <nav style={{ display: "flex", gap: "2rem", alignItems: "center" }}>
-          <Link to="/" style={{ textDecoration: "none", color: "#333" }}>
-            Početna
-          </Link>
-          <Link to="/events" style={{ textDecoration: "none", color: "#333" }}>
-            Događaji
-          </Link>
-          <Link
-            to="/categories"
-            style={{ textDecoration: "none", color: "#333" }}
-          >
-            Kategorije
-          </Link>
-          {isAuthenticated() && (
-            <Link
-              to="/tickets"
-              style={{ textDecoration: "none", color: "#333" }}
-            >
-              Moje karte
+
+        <nav className="navigation">
+          <div className="nav-links">
+            <Link to="/" className={isActive("/")}>
+              Početna
             </Link>
-          )}
-          <Link to="/cart" style={{ textDecoration: "none", color: "#333" }}>
-            Korpa{" "}
-            {cartItemsCount > 0 && (
-              <span className="cart-count">{cartItemsCount}</span>
+            <Link to="/events" className={isActive("/events")}>
+              Događaji
+            </Link>
+            <Link to="/categories" className={isActive("/categories")}>
+              Kategorije
+            </Link>
+            {isAuthenticated() && (
+              <Link to="/tickets" className={isActive("/tickets")}>
+                Moje karte
+              </Link>
             )}
-          </Link>
-          {isAdmin() && (
-            <div style={{ display: "flex", gap: "1rem" }}>
-              <Link
-                to="/admin/dashboard"
-                style={{
-                  textDecoration: "none",
-                  color: "#e74c3c",
-                  fontWeight: "bold",
-                }}
-              >
-                Dashboard
-              </Link>
-              <Link
-                to="/admin/events"
-                style={{
-                  textDecoration: "none",
-                  color: "#e74c3c",
-                  fontWeight: "bold",
-                }}
-              >
-                Događaji
-              </Link>
-              <Link
-                to="/admin/validation"
-                style={{
-                  textDecoration: "none",
-                  color: "#e74c3c",
-                  fontWeight: "bold",
-                }}
-              >
-                Validacija
-              </Link>
-            </div>
-          )}
-          <AuthStatus />
+          </div>
+
+          <div className="nav-actions">
+            <Link to="/cart" className="cart-link">
+              <span>Korpa</span>
+              {cartItemsCount > 0 && (
+                <span className="cart-count">{cartItemsCount}</span>
+              )}
+            </Link>
+
+            {isAdmin() && (
+              <div className="admin-links">
+                <Link to="/admin/dashboard" className="admin-link">
+                  Dashboard
+                </Link>
+                <Link to="/admin/events" className="admin-link">
+                  Događaji
+                </Link>
+                <Link to="/admin/validation" className="admin-link">
+                  Validacija
+                </Link>
+              </div>
+            )}
+
+            <AuthStatus />
+          </div>
         </nav>
       </div>
     </header>

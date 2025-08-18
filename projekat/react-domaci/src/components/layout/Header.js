@@ -64,6 +64,9 @@ const Header = () => {
                 <Link to="/admin/validation" className="admin-link">
                   Validacija
                 </Link>
+                <Link to="/admin/queue" className="admin-link">
+                  Queue
+                </Link>
               </div>
             )}
 

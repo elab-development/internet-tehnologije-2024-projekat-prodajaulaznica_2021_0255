@@ -124,6 +124,10 @@ return [
         'QrCode' => SimpleSoftwareIO\QrCode\Facades\QrCode::class,
     ])->toArray(),
 
+    'queue_enabled' => env('QUEUE_ENABLED', false),
+    'max_active_users' => env('MAX_ACTIVE_USERS', 100),
+
+
     'maintenance' => [
         'driver' => env('APP_MAINTENANCE_DRIVER', 'file'),
         'store' => env('APP_MAINTENANCE_STORE', 'database'),

@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\TicketController;
 use App\Http\Controllers\Api\AdminDashboardController;
+use App\Http\Controllers\Api\QueueController;
 
 Route::middleware(['api.errors', 'api.response'])->group(function () {
 
@@ -38,6 +39,12 @@ Route::middleware(['api.errors', 'api.response'])->group(function () {
     Route::get('events/{eventId}/cancellation-policy', [TicketController::class, 'getCancellationPolicy']);
     Route::post('tickets/validate/qr-code', [TicketController::class, 'validateQRCode']);
 
+    // Queue routes
+    Route::post('queue/join', [QueueController::class, 'joinQueue']);
+    Route::get('queue/status', [QueueController::class, 'checkQueueStatus']);
+    Route::delete('queue/leave', [QueueController::class, 'leaveQueue']);
+    Route::get('queue/stats', [QueueController::class, 'getQueueStats']);
+
     // Protected routes (authentication required)
     Route::middleware('auth:sanctum')->group(function () {
         // Auth routes
@@ -53,6 +60,17 @@ Route::middleware(['api.errors', 'api.response'])->group(function () {
             Route::get('dashboard/top-events', [AdminDashboardController::class, 'getTopEvents']);
             Route::get('dashboard/recent-activity', [AdminDashboardController::class, 'getRecentActivity']);
             Route::get('dashboard/upcoming-events', [AdminDashboardController::class, 'getUpcomingEvents']);
+
+            // Admin queue management - DODAJ OVE RUTE
+            Route::prefix('queue')->group(function () {
+            Route::post('enable', [QueueController::class, 'enableQueue']);
+            Route::post('disable', [QueueController::class, 'disableQueue']);
+            Route::post('max-users', [QueueController::class, 'setMaxUsers']);
+            Route::get('stats', [QueueController::class, 'getQueueStats']);
+            Route::delete('clear-waiting', [QueueController::class, 'clearWaitingQueue']);
+            Route::delete('clear-expired', [QueueController::class, 'clearExpiredSessions']);
+            Route::post('activate-next', [QueueController::class, 'activateNextInQueue']);
+    });
         });
 
         // Events - CRUD operations for authenticated users
@@ -85,6 +103,8 @@ Route::middleware(['api.errors', 'api.response'])->group(function () {
         Route::get('tickets/{id}/pdf', [TicketController::class, 'generateTicketPDF']);
         Route::get('tickets/{id}/receipt', [TicketController::class, 'generateReceipt']);
     });
+
+
 
     // Debug route for testing
     Route::post('debug', function (Request $request) {

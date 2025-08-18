@@ -422,6 +422,64 @@ export const apiService = {
       message: "Neispravni kod za popust",
     };
   },
+  // Queue methods
+  joinQueue: async () => {
+    const response = await api.post("/queue/join");
+    return response;
+  },
+
+  checkQueueStatus: async () => {
+    const response = await api.get("/queue/status");
+    return response;
+  },
+
+  leaveQueue: async () => {
+    const response = await api.delete("/queue/leave");
+    return response;
+  },
+
+  getQueueStats: async () => {
+    const response = await api.get("/queue/stats");
+    return response;
+  },
+
+  // Admin queue methods
+  enableQueue: async () => {
+    const response = await api.post("/admin/queue/enable");
+    return response;
+  },
+
+  disableQueue: async () => {
+    const response = await api.post("/admin/queue/disable");
+    return response;
+  },
+
+  setMaxQueueUsers: async (maxUsers) => {
+    const response = await api.post("/admin/queue/max-users", {
+      max_users: maxUsers,
+    });
+    return response;
+  },
+
+  getAdminQueueStats: async () => {
+    const response = await api.get("/admin/queue/stats");
+    return response;
+  },
+
+  clearWaitingQueue: async () => {
+    const response = await api.delete("/admin/queue/clear-waiting");
+    return response;
+  },
+
+  clearExpiredSessions: async () => {
+    const response = await api.delete("/admin/queue/clear-expired");
+    return response;
+  },
+
+  activateNextInQueue: async () => {
+    const response = await api.post("/admin/queue/activate-next");
+    return response;
+  },
 };
 
 export default apiService;

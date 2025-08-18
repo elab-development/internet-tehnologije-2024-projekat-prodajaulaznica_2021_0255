@@ -11,10 +11,13 @@ const EventCard = ({ event }) => {
   // Handle both old mock data and new Laravel API data
   const eventData = {
     id: event.id,
-    title: event.name || event.title, // Laravel uses 'name', mock data uses 'title'
+    name: event.name || event.title, // Koristimo 'name' jer Laravel koristi 'name'
+    title: event.name || event.title, // Zadržavamo i 'title' za kompatibilnost
     description: event.description,
     price: parseFloat(event.price) || 0,
-    date: event.start_date || event.date, // Laravel uses 'start_date'
+    start_date: event.start_date || event.date, // Laravel koristi 'start_date'
+    end_date: event.end_date, // Dodaj end_date
+    date: event.start_date || event.date, // Zadržavamo i 'date' za kompatibilnost
     time: event.start_date
       ? new Date(event.start_date).toLocaleTimeString("sr-RS", {
           hour: "2-digit",
@@ -27,44 +30,69 @@ const EventCard = ({ event }) => {
       event.thumbnail_url ||
       event.image ||
       "https://picsum.photos/400/250?random=" + event.id,
+    image_url: event.image_url || event.thumbnail_url, // Dodaj image_url
     category: event.category?.name || event.category || "Ostalo",
+    categoryObject: event.category, // Proslijedi ceo category objekat
     // Poboljšano mapiranje available_tickets
-    availableTickets: (() => {
-      // Prvo pokušaj event.available_tickets
+    available_tickets: (() => {
       if (
         typeof event.available_tickets === "number" &&
         event.available_tickets >= 0
       ) {
         return event.available_tickets;
       }
-      // Zatim pokušaj event.availableTickets
       if (
         typeof event.availableTickets === "number" &&
         event.availableTickets >= 0
       ) {
         return event.availableTickets;
       }
-      // Ako je string, pokušaj da ga konvertuješ
       if (typeof event.available_tickets === "string") {
         const parsed = parseInt(event.available_tickets, 10);
-        return !isNaN(parsed) && parsed >= 0 ? parsed : 100; // default 100
+        return !isNaN(parsed) && parsed >= 0 ? parsed : 100;
       }
       if (typeof event.availableTickets === "string") {
         const parsed = parseInt(event.availableTickets, 10);
-        return !isNaN(parsed) && parsed >= 0 ? parsed : 100; // default 100
+        return !isNaN(parsed) && parsed >= 0 ? parsed : 100;
       }
-      // Default vrednost ako ništa nije definisano
       return 100;
     })(),
+    availableTickets: (() => {
+      // Isto kao available_tickets za kompatibilnost
+      if (
+        typeof event.available_tickets === "number" &&
+        event.available_tickets >= 0
+      ) {
+        return event.available_tickets;
+      }
+      if (
+        typeof event.availableTickets === "number" &&
+        event.availableTickets >= 0
+      ) {
+        return event.availableTickets;
+      }
+      if (typeof event.available_tickets === "string") {
+        const parsed = parseInt(event.available_tickets, 10);
+        return !isNaN(parsed) && parsed >= 0 ? parsed : 100;
+      }
+      if (typeof event.availableTickets === "string") {
+        const parsed = parseInt(event.availableTickets, 10);
+        return !isNaN(parsed) && parsed >= 0 ? parsed : 100;
+      }
+      return 100;
+    })(),
+    total_tickets: event.total_tickets, // Dodaj total_tickets
     featured: event.is_featured || event.featured || false,
+    can_purchase: event.can_purchase, // Dodaj can_purchase
+    is_active: event.is_active, // Dodaj is_active
   };
 
   // Debug log za eventData
   console.log("EventCard processed eventData:", eventData);
   console.log(
     "Available tickets:",
-    eventData.availableTickets,
-    typeof eventData.availableTickets
+    eventData.available_tickets,
+    typeof eventData.available_tickets
   );
 
   const formatPrice = (price) => {
@@ -83,7 +111,7 @@ const EventCard = ({ event }) => {
 
   // Funkcija za određivanje da li su karte dostupne
   const isAvailable = () => {
-    return eventData.availableTickets > 0;
+    return eventData.available_tickets > 0;
   };
 
   return (
@@ -165,7 +193,7 @@ const EventCard = ({ event }) => {
                 fontWeight: "500",
               }}
             >
-              🎫 {eventData.availableTickets} dostupno
+              🎫 {eventData.available_tickets} dostupno
             </div>
           </div>
 
@@ -185,11 +213,12 @@ const EventCard = ({ event }) => {
       </div>
 
       <div style={{ padding: "0 1rem 1rem" }}>
+        {/* Proslijedi eventData umesto originalnog event objekta */}
         <QuickPurchase
           event={eventData}
           buttonText="Kupi karte"
           size="small"
-          disabled={!isAvailable()} // disabled prop
+          disabled={!isAvailable()}
         />
       </div>
     </div>

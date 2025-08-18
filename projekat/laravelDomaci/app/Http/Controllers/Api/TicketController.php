@@ -1269,74 +1269,70 @@ public function generateTicketPDF($id): JsonResponse
      * Enhanced ticket validation with detailed checks
      */
     private function validateTicketStatus(Ticket $ticket): array
-    {
-        $now = now();
-        $event = $ticket->event;
-       
-        // Check ticket status
-        if ($ticket->status !== 'active') {
-            return [
-                'valid' => false,
-                'message' => 'Ticket is ' . $ticket->status,
-                'details' => [
-                    'status' => $ticket->status,
-                    'reason' => 'ticket_inactive'
-                ]
-            ];
-        }
-
-        // Check if event has started
-        if ($event->start_date > $now) {
-            return [
-                'valid' => false,
-                'message' => 'Event has not started yet',
-                'details' => [
-                    'event_start' => $event->start_date,
-                    'current_time' => $now,
-                    'reason' => 'event_not_started'
-                ]
-            ];
-        }
-
-        // Check if event has ended
-        if ($event->end_date < $now) {
-            return [
-                'valid' => false,
-                'message' => 'Event has already ended',
-                'details' => [
-                    'event_end' => $event->end_date,
-                    'current_time' => $now,
-                    'reason' => 'event_ended'
-                ]
-            ];
-        }
-
-        // Check if ticket is within valid time window (e.g., 1 hour before event start)
-        $validFromTime = $event->start_date->subHour();
-        if ($now < $validFromTime) {
-            return [
-                'valid' => false,
-                'message' => 'Ticket validation opens 1 hour before event start',
-                'details' => [
-                    'valid_from' => $validFromTime,
-                    'current_time' => $now,
-                    'reason' => 'validation_window_not_open'
-                ]
-            ];
-        }
-
-        // All checks passed
+{
+    $now = now();
+    $event = $ticket->event;
+   
+    // Check ticket status first
+    if ($ticket->status !== 'active') {
         return [
-            'valid' => true,
-            'message' => 'Valid ticket',
+            'valid' => false,
+            'message' => 'Ticket is ' . $ticket->status,
             'details' => [
-                'ticket_status' => $ticket->status,
-                'event_status' => 'active',
-                'validation_time' => $now,
-                'reason' => 'valid'
+                'status' => $ticket->status,
+                'reason' => 'ticket_inactive'
             ]
         ];
     }
+
+    // Calculate time windows
+    $eventStart = $event->start_date;
+    $eventEnd = $event->end_date;
+    $validationOpens = $eventStart->copy()->subHour(); // 1 hour before start
+    
+    // Check if validation window is open
+    if ($now < $validationOpens) {
+        return [
+            'valid' => false,
+            'message' => 'Ticket validation opens 1 hour before event start',
+            'details' => [
+                'valid_from' => $validationOpens,
+                'current_time' => $now,
+                'event_start' => $eventStart,
+                'reason' => 'validation_window_not_open'
+            ]
+        ];
+    }
+
+    // Check if event has ended (with 1 hour grace period)
+    $validationCloses = $eventEnd->copy()->addHour();
+    if ($now > $validationCloses) {
+        return [
+            'valid' => false,
+            'message' => 'Event has ended. Validation no longer available.',
+            'details' => [
+                'event_end' => $eventEnd,
+                'validation_closed_at' => $validationCloses,
+                'current_time' => $now,
+                'reason' => 'event_ended'
+            ]
+        ];
+    }
+
+    // All checks passed - ticket is valid
+    return [
+        'valid' => true,
+        'message' => 'Valid ticket',
+        'details' => [
+            'ticket_status' => $ticket->status,
+            'event_status' => 'active',
+            'validation_time' => $now,
+            'event_start' => $eventStart,
+            'event_end' => $eventEnd,
+            'reason' => 'valid'
+        ]
+    ];
+}
 
     public function validateBulk(Request $request): JsonResponse
     {

@@ -8,7 +8,7 @@ class Ticket extends Model
 {
     use HasFactory;
 
-   protected $fillable = [
+ protected $fillable = [
         'user_id',
         'event_id',
         'ticket_number',
@@ -19,6 +19,7 @@ class Ticket extends Model
         'cancelled_at',
         'discount_percentage',
         'qr_code',
+        'qr_code_svg',
     ];
 
     protected $casts = [

@@ -7,6 +7,9 @@ import TicketCancellation from "./TicketCancellation";
 import QRCodeDisplay from "./QRCodeDisplay";
 import { useAuth } from "../../context/AuthContext";
 import apiService from "../../services/api";
+import { generateTicketPDF } from "../../services/pdfService";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 
 const UserTicketsDashboard = () => {
   const { user } = useAuth();
@@ -101,230 +104,32 @@ const UserTicketsDashboard = () => {
 
   const handleDownloadTicket = async (ticket) => {
     try {
+      setLoading && setLoading(true);
+
+      // Dobij podatke sa backend-a
       const response = await apiService.generateTicketPDF(ticket.id);
 
       if (response.success) {
         const ticketData = response.data;
 
-        // Kreiraj HTML sadržaj za ticket
-        const ticketHTML = `
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>Elektronska karta - ${ticketData.ticket_number}</title>
-    <style>
-        body {
-            font-family: 'Arial', sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            background: #f5f5f5;
-        }
-        .ticket-container {
-            background: white;
-            border: 3px dashed #333;
-            border-radius: 15px;
-            padding: 30px;
-            margin: 20px 0;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-        }
-        .ticket-header {
-            text-align: center;
-            border-bottom: 2px solid #eee;
-            padding-bottom: 20px;
-            margin-bottom: 30px;
-        }
-        .ticket-title {
-            font-size: 28px;
-            font-weight: bold;
-            color: #333;
-            margin: 0 0 10px 0;
-        }
-        .ticket-number {
-            font-size: 18px;
-            font-family: 'Courier New', monospace;
-            background: #f8f9fa;
-            padding: 8px 16px;
-            border-radius: 8px;
-            display: inline-block;
-            letter-spacing: 2px;
-        }
-        .event-info {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 30px;
-            margin-bottom: 30px;
-        }
-        .info-section h3 {
-            color: #007bff;
-            margin-bottom: 15px;
-            font-size: 18px;
-            border-bottom: 1px solid #007bff;
-            padding-bottom: 5px;
-        }
-        .info-item {
-            margin-bottom: 10px;
-            display: flex;
-            justify-content: space-between;
-        }
-        .info-label {
-            font-weight: bold;
-            color: #555;
-        }
-        .info-value {
-            color: #333;
-        }
-        .qr-section {
-            text-align: center;
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 10px;
-            margin: 20px 0;
-        }
-        .qr-code {
-            display: inline-block;
-            padding: 20px;
-            background: white;
-            border-radius: 10px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .instructions {
-            background: #e3f2fd;
-            border: 1px solid #2196f3;
-            border-radius: 8px;
-            padding: 15px;
-            margin-top: 20px;
-        }
-        .instructions h4 {
-            margin-top: 0;
-            color: #1976d2;
-        }
-        .footer {
-            text-align: center;
-            margin-top: 30px;
-            padding-top: 20px;
-            border-top: 1px solid #eee;
-            color: #666;
-            font-size: 14px;
-        }
-        @media print {
-            body { background: white; }
-            .ticket-container { box-shadow: none; }
-        }
-    </style>
-</head>
-<body>
-    <div class="ticket-container">
-        <div class="ticket-header">
-            <div class="ticket-title">🎫 ELEKTRONSKA KARTA</div>
-            <div class="ticket-number">${ticketData.ticket_number}</div>
-        </div>
+        // Generiši PDF
+        const pdf = await generateTicketPDF(ticketData);
 
-        <div class="event-info">
-            <div class="info-section">
-                <h3>📅 Informacije o događaju</h3>
-                <div class="info-item">
-                    <span class="info-label">Naziv:</span>
-                    <span class="info-value">${ticketData.event.name}</span>
-                </div>
-                <div class="info-item">
-                    <span class="info-label">Datum:</span>
-                    <span class="info-value">${ticketData.event.date}</span>
-                </div>
-                <div class="info-item">
-                    <span class="info-label">Vreme:</span>
-                    <span class="info-value">${ticketData.event.time}</span>
-                </div>
-                <div class="info-item">
-                    <span class="info-label">Lokacija:</span>
-                    <span class="info-value">${ticketData.event.location}</span>
-                </div>
-                <div class="info-item">
-                    <span class="info-label">Kategorija:</span>
-                    <span class="info-value">${ticketData.event.category}</span>
-                </div>
-            </div>
+        // Preuzmi PDF
+        pdf.save(`ticket-${ticketData.ticket_number}.pdf`);
 
-            <div class="info-section">
-                <h3>👤 Informacije o karti</h3>
-                <div class="info-item">
-                    <span class="info-label">Vlasnik:</span>
-                    <span class="info-value">${ticketData.user.name}</span>
-                </div>
-                <div class="info-item">
-                    <span class="info-label">Email:</span>
-                    <span class="info-value">${ticketData.user.email}</span>
-                </div>
-                <div class="info-item">
-                    <span class="info-label">Cena:</span>
-                    <span class="info-value">${formatPrice(
-                      ticketData.price
-                    )} RSD</span>
-                </div>
-                <div class="info-item">
-                    <span class="info-label">Kupljeno:</span>
-                    <span class="info-value">${ticketData.purchase_date}</span>
-                </div>
-                <div class="info-item">
-                    <span class="info-label">Status:</span>
-                    <span class="info-value">${getStatusText(
-                      ticketData.status
-                    )}</span>
-                </div>
-            </div>
-        </div>
-
-        <div class="qr-section">
-            <h3>📱 QR kod za ulaz</h3>
-            <div class="qr-code">
-                ${ticketData.qr_code_svg}
-            </div>
-            <p><strong>Pokažite ovaj kod na ulazu na događaj</strong></p>
-        </div>
-
-        <div class="instructions">
-            <h4>📋 Napomene:</h4>
-            <ul>
-                <li>Ponesitе ovu kartu (štampanu ili na telefonu) i važeći lični dokument</li>
-                <li>QR kod se može skenirati direktno sa ekrana telefona</li>
-                <li>Karta važi samo za navedeni datum i vreme</li>
-                <li>U slučaju problema kontaktirajte organizatore</li>
-            </ul>
-        </div>
-
-        <div class="footer">
-            <p>Ticket Master Pro | Elektronska karta generisana ${new Date().toLocaleString(
-              "sr-RS"
-            )}</p>
-        </div>
-    </div>
-</body>
-</html>`;
-
-        // Kreiraj i preuzmi HTML fajl
-        const blob = new Blob([ticketHTML], {
-          type: "text/html;charset=utf-8",
-        });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `ticket-${ticketData.ticket_number}.html`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-
-        // Opciono: Otvori u novom tab-u za štampanje
-        const printWindow = window.open("", "_blank");
-        printWindow.document.write(ticketHTML);
-        printWindow.document.close();
+        // Opciono: Otvori za pregled/štampanje
+        const pdfBlob = pdf.output("blob");
+        const url = URL.createObjectURL(pdfBlob);
+        window.open(url, "_blank");
       } else {
         throw new Error(response.message || "Greška pri generisanju karte");
       }
     } catch (err) {
-      console.error("Download error:", err);
-      alert("Greška pri preuzimanju karte: " + err.message);
+      console.error("PDF generation error:", err);
+      alert("Greška pri generisanju PDF-a: " + err.message);
+    } finally {
+      setLoading && setLoading(false);
     }
   };
 

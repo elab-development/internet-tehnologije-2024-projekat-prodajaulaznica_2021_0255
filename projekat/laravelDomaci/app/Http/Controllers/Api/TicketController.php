@@ -261,7 +261,7 @@ public function getQRCode($id): JsonResponse
         }
     }
 
-   public function generateTicketPDF($id): JsonResponse
+public function generateTicketPDF($id): JsonResponse
 {
     try {
         $ticket = Ticket::with(['event.category', 'user'])
@@ -270,15 +270,13 @@ public function getQRCode($id): JsonResponse
 
         // Osiguraj da SVG QR kod postoji
         if (empty($ticket->qr_code_svg)) {
-            // Generiši SVG iz JSON-a ako ne postoji
             if (!empty($ticket->qr_code)) {
                 $qrCodeSvg = QrCode::size(300)
                     ->format('svg')
                     ->generate($ticket->qr_code);
                 
-                // Sačuvaj u bazu
                 $ticket->update(['qr_code_svg' => $qrCodeSvg]);
-                $ticket->refresh(); // Osvezi model
+                $ticket->refresh();
             } else {
                 return response()->json([
                     'success' => false,
@@ -287,13 +285,13 @@ public function getQRCode($id): JsonResponse
             }
         }
 
-        // Kreiraj base64 reprezentaciju SVG-a za PDF
+        // Konvertuj SVG u base64 data URL za PDF
         $qrCodeBase64 = 'data:image/svg+xml;base64,' . base64_encode($ticket->qr_code_svg);
 
         $ticketData = [
             'ticket_number' => $ticket->ticket_number,
-            'qr_code_svg' => $ticket->qr_code_svg,           // SVG string
-            'qr_code_base64' => $qrCodeBase64,               // Base64 za PDF/img
+            'qr_code_svg' => $ticket->qr_code_svg,
+            'qr_code_base64' => $qrCodeBase64, // SVG kao base64
             'event' => [
                 'name' => $ticket->event->name,
                 'date' => $ticket->event->start_date->format('d.m.Y'),
@@ -316,16 +314,10 @@ public function getQRCode($id): JsonResponse
             'data' => $ticketData
         ]);
 
-    } catch (ModelNotFoundException $e) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Ticket not found'
-        ], 404);
     } catch (\Exception $e) {
         Log::error('Error generating PDF data', [
             'ticket_id' => $id,
             'error' => $e->getMessage(),
-            'trace' => $e->getTraceAsString()
         ]);
         
         return response()->json([
@@ -450,39 +442,75 @@ public function getQRCode($id): JsonResponse
      * Enhanced method for user ticket statistics with monthly spending
      */
     private function getUserTicketStats($userId): array
-    {
-        $tickets = Ticket::where('user_id', $userId);
-        
-        // Monthly spending for the last 12 months
-        $monthlySpending = Ticket::where('user_id', $userId)
-            ->selectRaw('DATE_FORMAT(purchase_date, "%Y-%m") as month')
-            ->selectRaw('SUM(price) as amount')
-            ->selectRaw('COUNT(*) as tickets_count')
-            ->where('purchase_date', '>=', now()->subMonths(12))
-            ->groupBy('month')
-            ->orderBy('month', 'desc')
-            ->get()
-            ->map(function($item) {
-                return [
-                    'month' => $item->month,
-                    'amount' => (float) $item->amount,
-                    'tickets_count' => $item->tickets_count
-                ];
-            });
+{
+    // PROBLEM: Originalna funkcija koristi isti query objekat više puta
+    // što dovodi do pogrešnih rezultata jer se WHERE uslovi akumuliraju
+    
+    // REŠENJE: Koristi fresh query za svaki count
+    $baseQuery = Ticket::where('user_id', $userId);
+    
+    // Ukupan broj karata
+    $total = (clone $baseQuery)->count();
+    
+    // Aktivne karte
+    $active = (clone $baseQuery)->where('status', 'active')->count();
+    
+    // Iskorišćene karte  
+    $used = (clone $baseQuery)->where('status', 'used')->count();
+    
+    // Otkazane karte - KLJUČNA IZMENA
+    $cancelled = (clone $baseQuery)->where('status', 'cancelled')->count();
+    
+    // Ukupno potrošeno (samo za neotkazane karte)
+    $totalSpent = (clone $baseQuery)
+        ->whereIn('status', ['active', 'used'])
+        ->sum('price');
+    
+    // Nadolazeći događaji
+    $upcomingEvents = (clone $baseQuery)
+        ->where('status', 'active')
+        ->whereHas('event', function($q) {
+            $q->where('start_date', '>', now());
+        })->count();
+    
+    // Monthly spending for the last 12 months (samo neotkazane karte)
+    $monthlySpending = Ticket::where('user_id', $userId)
+        ->selectRaw('DATE_FORMAT(purchase_date, "%Y-%m") as month')
+        ->selectRaw('SUM(price) as amount')
+        ->selectRaw('COUNT(*) as tickets_count')
+        ->where('purchase_date', '>=', now()->subMonths(12))
+        ->whereIn('status', ['active', 'used']) // Isključi otkazane iz spending-a
+        ->groupBy('month')
+        ->orderBy('month', 'desc')
+        ->get()
+        ->map(function($item) {
+            return [
+                'month' => $item->month,
+                'amount' => (float) $item->amount,
+                'tickets_count' => $item->tickets_count
+            ];
+        });
 
-        return [
-            'total' => $tickets->count(),
-            'active' => $tickets->where('status', 'active')->count(),
-            'used' => $tickets->where('status', 'used')->count(),
-            'cancelled' => $tickets->where('status', 'cancelled')->count(),
-            'total_spent' => $tickets->sum('price'),
-            'upcoming_events' => $tickets->where('status', 'active')
-                ->whereHas('event', function($q) {
-                    $q->where('start_date', '>', now());
-                })->count(),
-            'monthly_spending' => $monthlySpending
-        ];
-    }
+    // Debug logovanje za proveru
+    \Log::info('Ticket stats calculation', [
+        'user_id' => $userId,
+        'total' => $total,
+        'active' => $active,
+        'used' => $used,
+        'cancelled' => $cancelled,
+        'verification_sum' => $active + $used + $cancelled
+    ]);
+
+    return [
+        'total' => $total,
+        'active' => $active,
+        'used' => $used,
+        'cancelled' => $cancelled,
+        'total_spent' => (float) $totalSpent,
+        'upcoming_events' => $upcomingEvents,
+        'monthly_spending' => $monthlySpending
+    ];
+}
 
     /**
      * Get available categories for user's tickets

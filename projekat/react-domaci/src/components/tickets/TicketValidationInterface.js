@@ -32,10 +32,12 @@ const TicketValidationInterface = () => {
     try {
       const response = await apiService.getEvents();
       if (response.success) {
-        setEvents(response.data || []);
+        const eventsData = response.data?.data || response.data || [];
+        setEvents(Array.isArray(eventsData) ? eventsData : []);
       }
     } catch (error) {
       console.error("Error loading events:", error);
+      setEvents([]);
     }
   };
 

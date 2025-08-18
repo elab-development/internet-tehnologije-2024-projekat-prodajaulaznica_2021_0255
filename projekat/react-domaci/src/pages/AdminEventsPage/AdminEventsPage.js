@@ -34,11 +34,16 @@ const AdminEventsPage = () => {
       const response = await apiService.getEvents(currentPage, 10);
 
       if (response.success) {
-        setEvents(response.data || []);
-        setTotalPages(response.totalPages || 1);
+        // 🔧 Ispravka: pristupite podacima iz nested strukture
+        const eventsData = response.data?.data || response.data || [];
+        setEvents(Array.isArray(eventsData) ? eventsData : []);
+
+        // Takođe ažurirajte pagination podatke
+        setTotalPages(response.data?.last_page || 1);
       }
     } catch (err) {
       setError(err.message || "Greška pri učitavanju događaja");
+      setEvents([]); // Osigurajte da je uvek niz
     } finally {
       setLoading(false);
     }

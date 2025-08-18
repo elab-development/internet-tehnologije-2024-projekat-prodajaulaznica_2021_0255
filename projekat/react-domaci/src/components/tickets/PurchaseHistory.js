@@ -7,21 +7,27 @@ import apiService from "../../services/api";
 const PurchaseHistory = () => {
   const { user } = useAuth();
   const [tickets, setTickets] = useState([]);
-  const [pagination, setPagination] = useState({});
-  const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedTicket, setSelectedTicket] = useState(null);
-  const [showReceipt, setShowReceipt] = useState(null);
+  const [showingQRCode, setShowingQRCode] = useState(null);
+  const [qrCodeData, setQrCodeData] = useState(null);
+  const [loadingQR, setLoadingQR] = useState(false);
 
-  // Novi state za filtere
+  // Osnovni filteri bez paginacije za kompaktnu verziju
   const [filters, setFilters] = useState({
     status: "all",
     search: "",
     sortBy: "purchase_date",
     sortOrder: "desc",
-    per_page: 10,
-    page: 1,
+    per_page: 5, // Ograničeno na 5 karata
+  });
+
+  const [stats, setStats] = useState({
+    total: 0,
+    active: 0,
+    used: 0,
+    cancelled: 0,
   });
 
   useEffect(() => {
@@ -31,12 +37,13 @@ const PurchaseHistory = () => {
   const loadTickets = async () => {
     try {
       setLoading(true);
+      setError("");
+
       const response = await apiService.getMyTickets(filters);
 
       if (response.success) {
         setTickets(response.data.tickets || []);
-        setPagination(response.data.pagination || {});
-        setStats(response.data.stats || {});
+        setStats(response.data.stats || stats);
       }
     } catch (err) {
       setError(err.message || "Greška pri učitavanju karata");
@@ -45,30 +52,257 @@ const PurchaseHistory = () => {
     }
   };
 
-  // Nova funkcija za generisanje receipt-a
-  const handleGenerateReceipt = async (ticketId) => {
+  const handleFilterChange = (key, value) => {
+    setFilters((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleShowQR = async (ticket) => {
     try {
-      const response = await apiService.generateReceipt(ticketId);
+      setLoadingQR(true);
+      setShowingQRCode(ticket);
+
+      const response = await apiService.getTicketQRCode(ticket.id);
+
       if (response.success) {
-        setShowReceipt(response.data);
+        setQrCodeData(response.data);
+      } else {
+        throw new Error(response.message || "Greška pri učitavanju QR koda");
       }
     } catch (err) {
-      alert("Greška pri generisanju računa: " + err.message);
+      alert("Greška pri učitavanju QR koda: " + err.message);
+      setShowingQRCode(null);
+    } finally {
+      setLoadingQR(false);
     }
   };
 
-  // Funkcija za promenu filtera
-  const handleFilterChange = (key, value) => {
-    setFilters((prev) => ({
-      ...prev,
-      [key]: value,
-      page: 1, // Reset na prvu stranu kada se menjaju filteri
-    }));
-  };
+  const handleDownloadTicket = async (ticket) => {
+    try {
+      const response = await apiService.generateTicketPDF(ticket.id);
 
-  // Funkcija za promenu strane
-  const handlePageChange = (page) => {
-    setFilters((prev) => ({ ...prev, page }));
+      if (response.success) {
+        const ticketData = response.data;
+
+        // Kreiraj HTML sadržaj za ticket (isti kao u originalnoj komponenti)
+        const ticketHTML = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Elektronska karta - ${ticketData.ticket_number}</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .ticket-container {
+            background: white;
+            border: 3px dashed #333;
+            border-radius: 15px;
+            padding: 30px;
+            margin: 20px 0;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .ticket-header {
+            text-align: center;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        .ticket-title {
+            font-size: 28px;
+            font-weight: bold;
+            color: #333;
+            margin: 0 0 10px 0;
+        }
+        .ticket-number {
+            font-size: 18px;
+            font-family: 'Courier New', monospace;
+            background: #f8f9fa;
+            padding: 8px 16px;
+            border-radius: 8px;
+            display: inline-block;
+            letter-spacing: 2px;
+        }
+        .event-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+        .info-section h3 {
+            color: #007bff;
+            margin-bottom: 15px;
+            font-size: 18px;
+            border-bottom: 1px solid #007bff;
+            padding-bottom: 5px;
+        }
+        .info-item {
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .info-label {
+            font-weight: bold;
+            color: #555;
+        }
+        .info-value {
+            color: #333;
+        }
+        .qr-section {
+            text-align: center;
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        .qr-code {
+            display: inline-block;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .instructions {
+            background: #e3f2fd;
+            border: 1px solid #2196f3;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+        .instructions h4 {
+            margin-top: 0;
+            color: #1976d2;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            color: #666;
+            font-size: 14px;
+        }
+        @media print {
+            body { background: white; }
+            .ticket-container { box-shadow: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="ticket-container">
+        <div class="ticket-header">
+            <div class="ticket-title">🎫 ELEKTRONSKA KARTA</div>
+            <div class="ticket-number">${ticketData.ticket_number}</div>
+        </div>
+
+        <div class="event-info">
+            <div class="info-section">
+                <h3>📅 Informacije o događaju</h3>
+                <div class="info-item">
+                    <span class="info-label">Naziv:</span>
+                    <span class="info-value">${ticketData.event.name}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Datum:</span>
+                    <span class="info-value">${ticketData.event.date}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Vreme:</span>
+                    <span class="info-value">${ticketData.event.time}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Lokacija:</span>
+                    <span class="info-value">${ticketData.event.location}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Kategorija:</span>
+                    <span class="info-value">${ticketData.event.category}</span>
+                </div>
+            </div>
+
+            <div class="info-section">
+                <h3>👤 Informacije o karti</h3>
+                <div class="info-item">
+                    <span class="info-label">Vlasnik:</span>
+                    <span class="info-value">${ticketData.user.name}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Email:</span>
+                    <span class="info-value">${ticketData.user.email}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Cena:</span>
+                    <span class="info-value">${formatPrice(
+                      ticketData.price
+                    )} RSD</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Kupljeno:</span>
+                    <span class="info-value">${ticketData.purchase_date}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Status:</span>
+                    <span class="info-value">${getStatusText(
+                      ticketData.status
+                    )}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="qr-section">
+            <h3>📱 QR kod za ulaz</h3>
+            <div class="qr-code">
+                ${ticketData.qr_code_svg}
+            </div>
+            <p><strong>Pokažite ovaj kod na ulazu na događaj</strong></p>
+        </div>
+
+        <div class="instructions">
+            <h4>📋 Napomene:</h4>
+            <ul>
+                <li>Ponesitе ovu kartu (štampanu ili na telefonu) i važeći lični dokument</li>
+                <li>QR kod se može skenirati direktno sa ekrana telefona</li>
+                <li>Karta važi samo za navedeni datum i vreme</li>
+                <li>U slučaju problema kontaktirajte organizatore</li>
+            </ul>
+        </div>
+
+        <div class="footer">
+            <p>Ticket Master Pro | Elektronska karta generisana ${new Date().toLocaleString(
+              "sr-RS"
+            )}</p>
+        </div>
+    </div>
+</body>
+</html>`;
+
+        // Kreiraj i preuzmi HTML fajl
+        const blob = new Blob([ticketHTML], {
+          type: "text/html;charset=utf-8",
+        });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `ticket-${ticketData.ticket_number}.html`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+
+        // Opciono: Otvori u novom tab-u za štampanje
+        const printWindow = window.open("", "_blank");
+        printWindow.document.write(ticketHTML);
+        printWindow.document.close();
+      } else {
+        throw new Error(response.message || "Greška pri generisanju karte");
+      }
+    } catch (err) {
+      console.error("Download error:", err);
+      alert("Greška pri preuzimanju karte: " + err.message);
+    }
   };
 
   const handleCancelTicket = async (ticketId) => {
@@ -80,7 +314,7 @@ const PurchaseHistory = () => {
       const response = await apiService.cancelTicket(ticketId);
 
       if (response.success) {
-        loadTickets(); // Refresh the list
+        loadTickets();
         alert("Karta je uspešno otkazana");
       }
     } catch (err) {
@@ -91,7 +325,7 @@ const PurchaseHistory = () => {
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString("sr-RS", {
       year: "numeric",
-      month: "long",
+      month: "short",
       day: "numeric",
       hour: "2-digit",
       minute: "2-digit",
@@ -128,10 +362,18 @@ const PurchaseHistory = () => {
     }
   };
 
+  const canCancelTicket = (ticket) => {
+    return (
+      ticket.status === "active" &&
+      new Date(ticket.event?.start_date) > new Date()
+    );
+  };
+
   if (loading) {
     return (
       <div style={{ textAlign: "center", padding: "2rem" }}>
-        Učitavanje vaših karata...
+        <div style={{ fontSize: "1.5rem", marginBottom: "1rem" }}>⏳</div>
+        <p>Učitavanje vaših karata...</p>
       </div>
     );
   }
@@ -157,363 +399,153 @@ const PurchaseHistory = () => {
             marginBottom: "1rem",
           }}
         >
-          <h2>Moje karte</h2>
-          <Button variant="outline" onClick={loadTickets}>
-            Osveži
-          </Button>
+          <h2 style={{ margin: 0, fontSize: "1.5rem" }}>🎫 Moje karte</h2>
+          <div style={{ display: "flex", gap: "0.5rem" }}>
+            <Button
+              variant="outline"
+              size="small"
+              onClick={() => (window.location.href = "/my-tickets")}
+            >
+              Prikaži sve
+            </Button>
+            <Button variant="outline" size="small" onClick={loadTickets}>
+              🔄
+            </Button>
+          </div>
         </div>
 
-        {/* Statistike */}
+        {/* Kompaktne statistike */}
         {stats && Object.keys(stats).length > 0 && (
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
-              gap: "1rem",
+              gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+              gap: "0.75rem",
               marginBottom: "1rem",
             }}
           >
-            <div
-              style={{
-                padding: "1rem",
-                backgroundColor: "#f8f9fa",
-                borderRadius: "8px",
-                textAlign: "center",
-              }}
-            >
-              <div style={{ fontSize: "1.5rem", fontWeight: "bold" }}>
-                {stats.total_tickets || 0}
-              </div>
-              <div style={{ fontSize: "0.875rem", color: "#6c757d" }}>
-                Ukupno karata
-              </div>
-            </div>
-            <div
-              style={{
-                padding: "1rem",
-                backgroundColor: "#d4edda",
-                borderRadius: "8px",
-                textAlign: "center",
-              }}
-            >
-              <div style={{ fontSize: "1.5rem", fontWeight: "bold" }}>
-                {stats.active_tickets || 0}
-              </div>
-              <div style={{ fontSize: "0.875rem", color: "#155724" }}>
-                Aktivne karte
-              </div>
-            </div>
-            <div
-              style={{
-                padding: "1rem",
-                backgroundColor: "#d1ecf1",
-                borderRadius: "8px",
-                textAlign: "center",
-              }}
-            >
-              <div style={{ fontSize: "1.5rem", fontWeight: "bold" }}>
-                {formatPrice(stats.total_spent || 0)} RSD
-              </div>
-              <div style={{ fontSize: "0.875rem", color: "#0c5460" }}>
-                Ukupno potrošeno
-              </div>
-            </div>
+            <StatCard
+              title="Ukupno"
+              value={stats.total || 0}
+              color="#007bff"
+              bgColor="#e3f2fd"
+              icon="🎫"
+            />
+            <StatCard
+              title="Aktivne"
+              value={stats.active || 0}
+              color="#28a745"
+              bgColor="#d4edda"
+              icon="✅"
+            />
+            <StatCard
+              title="Otkazane"
+              value={stats.cancelled || 0}
+              color="#dc3545"
+              bgColor="#f8d7da"
+              icon="❌"
+            />
+            <StatCard
+              title="Iskorišćene"
+              value={stats.used || 0}
+              color="#6c757d"
+              bgColor="#e9ecef"
+              icon="✔️"
+            />
           </div>
         )}
       </div>
 
-      {/* Filteri */}
+      {/* Kompaktni filteri */}
       <div
         style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+          display: "flex",
           gap: "1rem",
-          marginBottom: "2rem",
-          padding: "1rem",
-          backgroundColor: "#f8f9fa",
-          borderRadius: "8px",
+          marginBottom: "1.5rem",
+          flexWrap: "wrap",
+          alignItems: "center",
         }}
       >
-        <div>
-          <label
-            style={{
-              display: "block",
-              marginBottom: "0.5rem",
-              fontSize: "0.875rem",
-            }}
-          >
-            Status:
-          </label>
-          <select
-            value={filters.status}
-            onChange={(e) => handleFilterChange("status", e.target.value)}
-            style={{
-              width: "100%",
-              padding: "0.5rem",
-              border: "1px solid #ced4da",
-              borderRadius: "4px",
-            }}
-          >
-            <option value="all">Sve karte</option>
-            <option value="active">Aktivne</option>
-            <option value="used">Iskorišćene</option>
-            <option value="cancelled">Otkazane</option>
-          </select>
-        </div>
+        <select
+          value={filters.status}
+          onChange={(e) => handleFilterChange("status", e.target.value)}
+          style={{
+            padding: "0.5rem",
+            border: "1px solid #ced4da",
+            borderRadius: "6px",
+            fontSize: "0.875rem",
+          }}
+        >
+          <option value="all">Sve karte</option>
+          <option value="active">Aktivne</option>
+          <option value="used">Iskorišćene</option>
+          <option value="cancelled">Otkazane</option>
+        </select>
 
-        <div>
-          <label
-            style={{
-              display: "block",
-              marginBottom: "0.5rem",
-              fontSize: "0.875rem",
-            }}
-          >
-            Pretraga:
-          </label>
-          <input
-            type="text"
-            value={filters.search}
-            onChange={(e) => handleFilterChange("search", e.target.value)}
-            placeholder="Naziv događaja ili lokacija..."
-            style={{
-              width: "100%",
-              padding: "0.5rem",
-              border: "1px solid #ced4da",
-              borderRadius: "4px",
-            }}
-          />
-        </div>
-
-        <div>
-          <label
-            style={{
-              display: "block",
-              marginBottom: "0.5rem",
-              fontSize: "0.875rem",
-            }}
-          >
-            Sortiranje:
-          </label>
-          <select
-            value={filters.sortBy}
-            onChange={(e) => handleFilterChange("sortBy", e.target.value)}
-            style={{
-              width: "100%",
-              padding: "0.5rem",
-              border: "1px solid #ced4da",
-              borderRadius: "4px",
-            }}
-          >
-            <option value="purchase_date">Datum kupovine</option>
-            <option value="event_date">Datum događaja</option>
-            <option value="price">Cena</option>
-            <option value="status">Status</option>
-          </select>
-        </div>
-
-        <div>
-          <label
-            style={{
-              display: "block",
-              marginBottom: "0.5rem",
-              fontSize: "0.875rem",
-            }}
-          >
-            Redosled:
-          </label>
-          <select
-            value={filters.sortOrder}
-            onChange={(e) => handleFilterChange("sortOrder", e.target.value)}
-            style={{
-              width: "100%",
-              padding: "0.5rem",
-              border: "1px solid #ced4da",
-              borderRadius: "4px",
-            }}
-          >
-            <option value="desc">Opadajuće</option>
-            <option value="asc">Rastući</option>
-          </select>
-        </div>
+        <input
+          type="text"
+          value={filters.search}
+          onChange={(e) => handleFilterChange("search", e.target.value)}
+          placeholder="Pretraži događaje..."
+          style={{
+            padding: "0.5rem",
+            border: "1px solid #ced4da",
+            borderRadius: "6px",
+            fontSize: "0.875rem",
+            minWidth: "200px",
+          }}
+        />
       </div>
 
       {tickets.length === 0 ? (
         <div
           style={{
             textAlign: "center",
-            padding: "3rem",
+            padding: "3rem 1rem",
             backgroundColor: "#f8f9fa",
-            borderRadius: "8px",
+            borderRadius: "12px",
+            border: "2px dashed #dee2e6",
           }}
         >
-          <h3>Nemate kupljenih karata</h3>
-          <p>Kada kupite karte, one će se pojaviti ovde.</p>
+          <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>🎫</div>
+          <h3 style={{ marginBottom: "0.5rem", color: "#495057" }}>
+            Nema karata
+          </h3>
+          <p style={{ color: "#6c757d", marginBottom: "1.5rem" }}>
+            {filters.status === "all"
+              ? "Nemate kupljenih karata."
+              : `Nemate karata sa statusom "${getStatusText(filters.status)}".`}
+          </p>
           <Button onClick={() => (window.location.href = "/events")}>
-            Pogledaj događaje
+            🎭 Pogledaj događaje
           </Button>
         </div>
       ) : (
-        <>
-          <div
-            style={{
-              display: "grid",
-              gap: "1rem",
-            }}
-          >
-            {tickets.map((ticket) => (
-              <div
-                key={ticket.id}
-                style={{
-                  backgroundColor: "white",
-                  border: "1px solid #dee2e6",
-                  borderRadius: "8px",
-                  padding: "1.5rem",
-                  boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-                }}
-              >
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr auto",
-                    gap: "1rem",
-                    alignItems: "start",
-                  }}
-                >
-                  <div>
-                    <h4 style={{ margin: "0 0 0.5rem 0" }}>
-                      {ticket.event?.name}
-                    </h4>
-
-                    <div
-                      style={{
-                        fontSize: "0.875rem",
-                        color: "#6c757d",
-                        marginBottom: "1rem",
-                      }}
-                    >
-                      <div>📅 {formatDate(ticket.event?.start_date)}</div>
-                      <div>📍 {ticket.event?.location}</div>
-                      <div>🎫 {ticket.ticket_number}</div>
-                    </div>
-
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: "1rem",
-                        alignItems: "center",
-                        flexWrap: "wrap",
-                      }}
-                    >
-                      <span
-                        style={{
-                          padding: "0.25rem 0.5rem",
-                          backgroundColor: getStatusColor(ticket.status),
-                          color: "white",
-                          borderRadius: "4px",
-                          fontSize: "0.875rem",
-                        }}
-                      >
-                        {getStatusText(ticket.status)}
-                      </span>
-
-                      <span style={{ fontWeight: "bold" }}>
-                        {formatPrice(ticket.price)} RSD
-                      </span>
-
-                      {ticket.discount_percentage > 0 && (
-                        <span
-                          style={{
-                            color: "#28a745",
-                            fontSize: "0.875rem",
-                          }}
-                        >
-                          Popust {ticket.discount_percentage}%
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "0.5rem",
-                    }}
-                  >
-                    <Button
-                      size="small"
-                      variant="outline"
-                      onClick={() => setSelectedTicket(ticket)}
-                    >
-                      Detalji
-                    </Button>
-
-                    {/* Nova dugme za receipt */}
-                    <Button
-                      size="small"
-                      variant="outline"
-                      onClick={() => handleGenerateReceipt(ticket.id)}
-                    >
-                      Račun
-                    </Button>
-
-                    {ticket.status === "active" &&
-                      new Date(ticket.event?.start_date) > new Date() && (
-                        <Button
-                          size="small"
-                          variant="danger"
-                          onClick={() => handleCancelTicket(ticket.id)}
-                        >
-                          Otkaži
-                        </Button>
-                      )}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Paginacija */}
-          {pagination && pagination.last_page > 1 && (
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-                gap: "1rem",
-                marginTop: "2rem",
-                padding: "1rem",
-              }}
-            >
-              <Button
-                variant="outline"
-                size="small"
-                disabled={pagination.current_page === 1}
-                onClick={() => handlePageChange(pagination.current_page - 1)}
-              >
-                Prethodna
-              </Button>
-
-              <span style={{ fontSize: "0.875rem", color: "#6c757d" }}>
-                Strana {pagination.current_page} od {pagination.last_page}(
-                {pagination.total} ukupno)
-              </span>
-
-              <Button
-                variant="outline"
-                size="small"
-                disabled={pagination.current_page === pagination.last_page}
-                onClick={() => handlePageChange(pagination.current_page + 1)}
-              >
-                Sledeća
-              </Button>
-            </div>
-          )}
-        </>
+        <div
+          style={{
+            display: "grid",
+            gap: "1rem",
+          }}
+        >
+          {tickets.map((ticket) => (
+            <CompactTicketCard
+              key={ticket.id}
+              ticket={ticket}
+              onViewDetails={() => setSelectedTicket(ticket)}
+              onShowQR={() => handleShowQR(ticket)}
+              onDownload={() => handleDownloadTicket(ticket)}
+              onCancel={() => handleCancelTicket(ticket.id)}
+              canCancelTicket={canCancelTicket}
+              formatDate={formatDate}
+              formatPrice={formatPrice}
+              getStatusColor={getStatusColor}
+              getStatusText={getStatusText}
+            />
+          ))}
+        </div>
       )}
 
-      {/* Ticket details modal */}
+      {/* Modals */}
       <Modal
         isOpen={!!selectedTicket}
         onClose={() => setSelectedTicket(null)}
@@ -524,290 +556,326 @@ const PurchaseHistory = () => {
           <TicketDetails
             ticket={selectedTicket}
             onClose={() => setSelectedTicket(null)}
+            formatDate={formatDate}
+            formatPrice={formatPrice}
+            getStatusColor={getStatusColor}
+            getStatusText={getStatusText}
           />
         )}
       </Modal>
 
-      {/* Receipt modal */}
-      <Modal
-        isOpen={!!showReceipt}
-        onClose={() => setShowReceipt(null)}
-        title="Račun"
-        size="medium"
-      >
-        {showReceipt && (
-          <ReceiptView
-            receipt={showReceipt}
-            onClose={() => setShowReceipt(null)}
-          />
-        )}
-      </Modal>
+      <QRCodeModal
+        isOpen={!!showingQRCode}
+        onClose={() => {
+          setShowingQRCode(null);
+          setQrCodeData(null);
+        }}
+        ticket={showingQRCode}
+        qrCodeData={qrCodeData}
+        loading={loadingQR}
+      />
     </div>
   );
 };
 
-// Nova komponenta za prikaz receipt-a
-const ReceiptView = ({ receipt, onClose }) => {
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString("sr-RS", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
+// Helper Components
+const StatCard = ({ title, value, color, bgColor, icon }) => (
+  <div
+    style={{
+      backgroundColor: bgColor,
+      padding: "1rem",
+      borderRadius: "8px",
+      textAlign: "center",
+      border: `1px solid ${color}30`,
+    }}
+  >
+    <div style={{ fontSize: "1rem", marginBottom: "0.25rem" }}>{icon}</div>
+    <div
+      style={{
+        fontSize: "1.25rem",
+        fontWeight: "bold",
+        color,
+        marginBottom: "0.125rem",
+      }}
+    >
+      {value}
+    </div>
+    <div style={{ fontSize: "0.75rem", color: "#6c757d", fontWeight: "500" }}>
+      {title}
+    </div>
+  </div>
+);
 
-  const formatPrice = (price) => {
-    return new Intl.NumberFormat("sr-RS").format(price);
-  };
+const CompactTicketCard = ({
+  ticket,
+  onViewDetails,
+  onShowQR,
+  onDownload,
+  onCancel,
+  canCancelTicket,
+  formatDate,
+  formatPrice,
+  getStatusColor,
+  getStatusText,
+}) => (
+  <div
+    style={{
+      backgroundColor: "white",
+      border: "1px solid #dee2e6",
+      borderRadius: "8px",
+      padding: "1rem",
+      boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
+      transition: "box-shadow 0.2s",
+    }}
+    onMouseEnter={(e) =>
+      (e.currentTarget.style.boxShadow = "0 4px 8px rgba(0,0,0,0.1)")
+    }
+    onMouseLeave={(e) =>
+      (e.currentTarget.style.boxShadow = "0 2px 4px rgba(0,0,0,0.05)")
+    }
+  >
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "1fr auto",
+        gap: "1rem",
+        alignItems: "start",
+      }}
+    >
+      <div>
+        <h4 style={{ margin: "0 0 0.5rem 0", fontSize: "1rem" }}>
+          {ticket.event?.name}
+        </h4>
 
-  const handlePrint = () => {
-    window.print();
-  };
-
-  return (
-    <div style={{ padding: "1rem", fontFamily: "Arial, sans-serif" }}>
-      {/* Header */}
-      <div
-        style={{
-          textAlign: "center",
-          marginBottom: "2rem",
-          borderBottom: "2px solid #000",
-          paddingBottom: "1rem",
-        }}
-      >
-        <h2 style={{ margin: "0", fontSize: "1.5rem" }}>
-          {receipt.company.name}
-        </h2>
         <div
           style={{
-            fontSize: "0.875rem",
+            fontSize: "0.8rem",
             color: "#6c757d",
-            marginTop: "0.5rem",
+            marginBottom: "0.75rem",
+            display: "grid",
+            gap: "0.25rem",
           }}
         >
-          <div>{receipt.company.address}</div>
-          <div>PIB: {receipt.company.tax_number}</div>
-          <div>Tel: {receipt.company.phone}</div>
+          <div>📅 {formatDate(ticket.event?.start_date)}</div>
+          <div>📍 {ticket.event?.location}</div>
+          <div>🎫 {ticket.ticket_number}</div>
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            gap: "0.75rem",
+            alignItems: "center",
+            flexWrap: "wrap",
+          }}
+        >
+          <span
+            style={{
+              padding: "0.25rem 0.75rem",
+              backgroundColor: getStatusColor(ticket.status),
+              color: "white",
+              borderRadius: "15px",
+              fontSize: "0.75rem",
+              fontWeight: "600",
+            }}
+          >
+            {getStatusText(ticket.status)}
+          </span>
+
+          <span style={{ fontWeight: "bold", fontSize: "0.9rem" }}>
+            {formatPrice(ticket.price)} RSD
+          </span>
+
+          {ticket.discount_percentage > 0 && (
+            <span
+              style={{
+                color: "#28a745",
+                fontSize: "0.75rem",
+                backgroundColor: "#d4edda",
+                padding: "0.125rem 0.5rem",
+                borderRadius: "10px",
+              }}
+            >
+              -{ticket.discount_percentage}%
+            </span>
+          )}
         </div>
       </div>
 
-      {/* Receipt info */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: "2rem",
-          marginBottom: "2rem",
-        }}
-      >
-        <div>
-          <h4>Informacije o računu</h4>
-          <div>
-            <strong>Broj računa:</strong> {receipt.receipt_number}
-          </div>
-          <div>
-            <strong>Datum izdavanja:</strong> {formatDate(receipt.issue_date)}
-          </div>
-        </div>
-        <div>
-          <h4>Kupac</h4>
-          <div>
-            <strong>Ime:</strong> {receipt.customer.name}
-          </div>
-          <div>
-            <strong>Email:</strong> {receipt.customer.email}
-          </div>
-        </div>
-      </div>
-
-      {/* Event info */}
-      <div style={{ marginBottom: "2rem" }}>
-        <h4>Događaj</h4>
-        <div>
-          <strong>Naziv:</strong> {receipt.event.name}
-        </div>
-        <div>
-          <strong>Datum:</strong> {formatDate(receipt.event.start_date)}
-        </div>
-        <div>
-          <strong>Lokacija:</strong> {receipt.event.location}
-        </div>
-        <div>
-          <strong>Kategorija:</strong> {receipt.event.category}
-        </div>
-      </div>
-
-      {/* Ticket details */}
-      <div style={{ marginBottom: "2rem" }}>
-        <h4>Detalji karte</h4>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-          <thead>
-            <tr style={{ borderBottom: "1px solid #dee2e6" }}>
-              <th style={{ textAlign: "left", padding: "0.5rem" }}>Opis</th>
-              <th style={{ textAlign: "right", padding: "0.5rem" }}>Cena</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td style={{ padding: "0.5rem" }}>
-                Karta - {receipt.event.name}
-                <br />
-                <small>Broj karte: {receipt.ticket.ticket_number}</small>
-              </td>
-              <td style={{ textAlign: "right", padding: "0.5rem" }}>
-                {formatPrice(receipt.ticket.original_price)} RSD
-              </td>
-            </tr>
-            {receipt.ticket.discount_percentage > 0 && (
-              <tr>
-                <td style={{ padding: "0.5rem" }}>
-                  Popust ({receipt.ticket.discount_percentage}%)
-                </td>
-                <td
-                  style={{
-                    textAlign: "right",
-                    padding: "0.5rem",
-                    color: "#28a745",
-                  }}
-                >
-                  -{formatPrice(receipt.ticket.discount_amount)} RSD
-                </td>
-              </tr>
-            )}
-            <tr style={{ borderTop: "1px solid #dee2e6", fontWeight: "bold" }}>
-              <td style={{ padding: "0.5rem" }}>UKUPNO</td>
-              <td style={{ textAlign: "right", padding: "0.5rem" }}>
-                {formatPrice(receipt.ticket.price)} RSD
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      {/* Footer */}
-      <div
-        style={{
-          textAlign: "center",
-          marginTop: "2rem",
-          paddingTop: "1rem",
-          borderTop: "1px solid #dee2e6",
-        }}
-      >
-        <div style={{ fontSize: "0.875rem", color: "#6c757d" }}>
-          Hvala vam na kupovini!
-        </div>
-      </div>
-
-      {/* Action buttons */}
       <div
         style={{
           display: "flex",
-          justifyContent: "center",
-          gap: "1rem",
-          marginTop: "2rem",
+          flexDirection: "column",
+          gap: "0.5rem",
+          minWidth: "100px",
         }}
       >
-        <Button variant="outline" onClick={handlePrint}>
-          Štampaj
+        <Button size="small" variant="outline" onClick={onViewDetails}>
+          📋 Detalji
         </Button>
-        <Button onClick={onClose}>Zatvori</Button>
+
+        <Button size="small" variant="outline" onClick={onShowQR}>
+          📱 QR
+        </Button>
+
+        <Button size="small" variant="outline" onClick={onDownload}>
+          📥 PDF
+        </Button>
+
+        {canCancelTicket(ticket) && (
+          <Button size="small" variant="danger" onClick={onCancel}>
+            ❌ Otkaži
+          </Button>
+        )}
       </div>
     </div>
-  );
-};
+  </div>
+);
 
-// Ticket details component
-const TicketDetails = ({ ticket, onClose }) => {
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString("sr-RS", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
-  const formatPrice = (price) => {
-    return new Intl.NumberFormat("sr-RS").format(price);
-  };
-
-  return (
-    <div style={{ padding: "1rem" }}>
+const TicketDetails = ({
+  ticket,
+  onClose,
+  formatDate,
+  formatPrice,
+  getStatusColor,
+  getStatusText,
+}) => (
+  <div style={{ padding: "1rem" }}>
+    <div
+      style={{
+        textAlign: "center",
+        marginBottom: "2rem",
+        padding: "1.5rem",
+        backgroundColor: "#f8f9fa",
+        borderRadius: "8px",
+        border: "2px dashed #dee2e6",
+      }}
+    >
+      <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>🎫</div>
       <div
         style={{
-          textAlign: "center",
-          marginBottom: "2rem",
-          padding: "1rem",
-          backgroundColor: "#f8f9fa",
-          borderRadius: "8px",
+          fontSize: "1.25rem",
+          fontFamily: "monospace",
+          fontWeight: "bold",
+          marginBottom: "0.5rem",
+          letterSpacing: "1px",
         }}
       >
-        <div
-          style={{
-            fontSize: "2rem",
-            fontFamily: "monospace",
-            fontWeight: "bold",
-            marginBottom: "0.5rem",
-          }}
-        >
-          {ticket.ticket_number}
-        </div>
-        <div style={{ fontSize: "0.875rem", color: "#6c757d" }}>
-          QR kod: {ticket.qr_code}
-        </div>
+        {ticket.ticket_number}
       </div>
-
-      <div style={{ marginBottom: "2rem" }}>
-        <h4>Informacije o događaju</h4>
-        <div style={{ display: "grid", gap: "0.5rem" }}>
-          <div>
-            <strong>Naziv:</strong> {ticket.event?.name}
-          </div>
-          <div>
-            <strong>Datum:</strong> {formatDate(ticket.event?.start_date)}
-          </div>
-          <div>
-            <strong>Lokacija:</strong> {ticket.event?.location}
-          </div>
-          <div>
-            <strong>Kategorija:</strong> {ticket.event?.category?.name}
-          </div>
-        </div>
-      </div>
-
-      <div style={{ marginBottom: "2rem" }}>
-        <h4>Informacije o karti</h4>
-        <div style={{ display: "grid", gap: "0.5rem" }}>
-          <div>
-            <strong>Status:</strong> {ticket.status}
-          </div>
-          <div>
-            <strong>Cena:</strong> {formatPrice(ticket.price)} RSD
-          </div>
-          {ticket.discount_percentage > 0 && (
-            <div>
-              <strong>Popust:</strong> {ticket.discount_percentage}%
-            </div>
-          )}
-          <div>
-            <strong>Datum kupovine:</strong> {formatDate(ticket.purchase_date)}
-          </div>
-          {ticket.used_at && (
-            <div>
-              <strong>Datum korišćenja:</strong> {formatDate(ticket.used_at)}
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div style={{ textAlign: "center" }}>
-        <Button onClick={onClose}>Zatvori</Button>
+      <div style={{ fontSize: "0.875rem", color: "#6c757d" }}>
+        Elektronska karta
       </div>
     </div>
-  );
-};
+
+    <div style={{ marginBottom: "2rem" }}>
+      <h4>Informacije o događaju</h4>
+      <div style={{ display: "grid", gap: "0.5rem", fontSize: "0.9rem" }}>
+        <div>
+          <strong>Naziv:</strong> {ticket.event?.name}
+        </div>
+        <div>
+          <strong>Datum:</strong> {formatDate(ticket.event?.start_date)}
+        </div>
+        <div>
+          <strong>Lokacija:</strong> {ticket.event?.location}
+        </div>
+        <div>
+          <strong>Kategorija:</strong> {ticket.event?.category?.name}
+        </div>
+      </div>
+    </div>
+
+    <div style={{ marginBottom: "2rem" }}>
+      <h4>Informacije o karti</h4>
+      <div style={{ display: "grid", gap: "0.5rem", fontSize: "0.9rem" }}>
+        <div>
+          <strong>Status:</strong>{" "}
+          <span
+            style={{
+              padding: "0.25rem 0.5rem",
+              backgroundColor: getStatusColor(ticket.status),
+              color: "white",
+              borderRadius: "12px",
+              fontSize: "0.75rem",
+              marginLeft: "0.5rem",
+            }}
+          >
+            {getStatusText(ticket.status)}
+          </span>
+        </div>
+        <div>
+          <strong>Cena:</strong> {formatPrice(ticket.price)} RSD
+        </div>
+        <div>
+          <strong>Kupljeno:</strong> {formatDate(ticket.purchase_date)}
+        </div>
+        {ticket.discount_percentage > 0 && (
+          <div>
+            <strong>Popust:</strong> {ticket.discount_percentage}%
+          </div>
+        )}
+        {ticket.used_at && (
+          <div>
+            <strong>Korišćeno:</strong> {formatDate(ticket.used_at)}
+          </div>
+        )}
+      </div>
+    </div>
+
+    <div style={{ textAlign: "center" }}>
+      <Button onClick={onClose}>Zatvori</Button>
+    </div>
+  </div>
+);
+
+const QRCodeModal = ({ isOpen, onClose, ticket, qrCodeData, loading }) => (
+  <Modal isOpen={isOpen} onClose={onClose} title="QR kod karte" size="medium">
+    <div style={{ textAlign: "center", padding: "1rem" }}>
+      {loading ? (
+        <div>
+          <div style={{ fontSize: "2rem", marginBottom: "1rem" }}>⏳</div>
+          <p>Učitavanje QR koda...</p>
+        </div>
+      ) : qrCodeData ? (
+        <div>
+          <div style={{ marginBottom: "1rem" }}>
+            <h4>{ticket?.event?.name}</h4>
+            <p style={{ fontSize: "0.9rem", color: "#6c757d" }}>
+              {ticket?.ticket_number}
+            </p>
+          </div>
+          <div
+            style={{
+              backgroundColor: "white",
+              padding: "2rem",
+              borderRadius: "8px",
+              display: "inline-block",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+            }}
+            dangerouslySetInnerHTML={{ __html: qrCodeData.qr_code_svg }}
+          />
+          <p
+            style={{
+              marginTop: "1rem",
+              fontSize: "0.875rem",
+              color: "#6c757d",
+            }}
+          >
+            Pokažite ovaj QR kod na ulazu
+          </p>
+          <Button onClick={onClose} style={{ marginTop: "1rem" }}>
+            Zatvori
+          </Button>
+        </div>
+      ) : (
+        <div>
+          <p>Greška pri učitavanju QR koda</p>
+          <Button onClick={onClose}>Zatvori</Button>
+        </div>
+      )}
+    </div>
+  </Modal>
+);
 
 export default PurchaseHistory;

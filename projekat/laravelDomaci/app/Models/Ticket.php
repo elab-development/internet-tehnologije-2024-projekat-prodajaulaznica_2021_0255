@@ -9,32 +9,24 @@ class Ticket extends Model
     use HasFactory;
 
    protected $fillable = [
+        'user_id',
+        'event_id',
         'ticket_number',
-        'qr_code',
-        'qr_code_path',
-        'qr_code_svg',
         'price',
-        'discount_percentage',
         'status',
         'purchase_date',
         'used_at',
         'cancelled_at',
-        'refund_amount',
-        'cancellation_fee',
-        'cancellation_reason',
-        'event_id',
-        'user_id'
+        'discount_percentage',
+        'qr_code',
     ];
-
 
     protected $casts = [
         'purchase_date' => 'datetime',
         'used_at' => 'datetime',
         'cancelled_at' => 'datetime',
         'price' => 'decimal:2',
-        'refund_amount' => 'decimal:2',
-        'cancellation_fee' => 'decimal:2',
-        'discount_percentage' => 'decimal:2'
+        'discount_percentage' => 'integer',
     ];
 
     // Relacije

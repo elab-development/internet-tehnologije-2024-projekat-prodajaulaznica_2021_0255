@@ -45,7 +45,8 @@ Route::middleware(['api.errors', 'api.response'])->group(function () {
         Route::post('refresh', [AuthController::class, 'refresh']);
         Route::get('user', [AuthController::class, 'user']);
 
-        Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
+        // Admin routes
+        Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function () {
             Route::get('dashboard/overview', [AdminDashboardController::class, 'getOverviewStats']);
             Route::get('dashboard/revenue-chart', [AdminDashboardController::class, 'getRevenueChart']);
             Route::get('dashboard/category-stats', [AdminDashboardController::class, 'getCategoryStats']);

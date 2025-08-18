@@ -12,23 +12,41 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        // CORS mora biti PRVI u nizu
         $middleware->api(prepend: [
             \Illuminate\Http\Middleware\HandleCors::class,
         ]);
 
-        // Zatim ostali middleware
         $middleware->api([
             \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
-            // 'throttle:api', // Uklanjamo ovo privremeno
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
         ]);
        
         $middleware->alias([
             'api.response' => \App\Http\Middleware\ApiResponseMiddleware::class,
             'api.errors' => \App\Http\Middleware\ErrorHandlingMiddleware::class,
+            'admin' => \App\Http\Middleware\AdminMiddleware::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        // Dodaj detaljno logovanje za API greške
+        $exceptions->render(function (Throwable $e, $request) {
+            if ($request->is('api/*')) {
+                \Log::error('API Error: ' . $e->getMessage(), [
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                    'trace' => $e->getTraceAsString(),
+                    'request_data' => $request->all()
+                ]);
+                
+                return response()->json([
+                    'success' => false,
+                    'message' => app()->environment('local') ? $e->getMessage() : 'Internal server error',
+                    'error' => app()->environment('local') ? [
+                        'file' => $e->getFile(),
+                        'line' => $e->getLine(),
+                        'trace' => $e->getTrace()
+                    ] : null
+                ], 500);
+            }
+        });
     })->create();

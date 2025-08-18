@@ -17,8 +17,12 @@ export const AuthProvider = ({ children }) => {
 
       if (storedUser && storedToken) {
         try {
-          setUser(JSON.parse(storedUser));
+          const parsedUser = JSON.parse(storedUser);
+          setUser(parsedUser);
           setToken(storedToken);
+
+          // Verify token is still valid
+          await checkAuthStatus();
         } catch (error) {
           console.error("Error parsing stored user data:", error);
           clearAuthData();
@@ -43,7 +47,6 @@ export const AuthProvider = ({ children }) => {
     try {
       setLoading(true);
 
-      // Uklonili smo getCsrfCookie poziv
       const response = await apiService.login(credentials);
 
       if (response.success) {
@@ -77,7 +80,6 @@ export const AuthProvider = ({ children }) => {
     try {
       setLoading(true);
 
-      // Uklonili smo getCsrfCookie poziv
       const response = await apiService.register(userData);
 
       if (response.success) {
@@ -108,7 +110,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Ostatak koda ostaje isti...
   const logout = async () => {
     try {
       setLoading(true);
@@ -131,8 +132,10 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await apiService.checkAuth();
       if (response.success) {
-        if (response.data.user) {
-          updateUser(response.data.user);
+        if (response.data.user || response.data) {
+          // Handle different response structures
+          const userData = response.data.user || response.data;
+          updateUser(userData);
         }
         return true;
       }
@@ -149,11 +152,12 @@ export const AuthProvider = ({ children }) => {
     return !!(user && token);
   };
 
+  // Check auth status periodically
   useEffect(() => {
     if (isAuthenticated()) {
       const interval = setInterval(() => {
         checkAuthStatus();
-      }, 10 * 60 * 1000);
+      }, 10 * 60 * 1000); // Check every 10 minutes
 
       return () => clearInterval(interval);
     }
@@ -165,12 +169,18 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem("user", JSON.stringify(updatedUser));
   };
 
-  const hasRole = (role) => {
-    return user?.role === role;
+  // Updated admin check to use is_admin field
+  const isAdmin = () => {
+    return user && user.is_admin === true;
   };
 
-  const isAdmin = () => {
-    return hasRole("admin");
+  // Keep hasRole for backward compatibility but update logic
+  const hasRole = (role) => {
+    if (role === "admin") {
+      return isAdmin();
+    }
+    // Add other role checks here if needed
+    return false;
   };
 
   const value = {
@@ -186,6 +196,7 @@ export const AuthProvider = ({ children }) => {
     hasRole,
     isAdmin,
     clearAuthData,
+    checkAuthStatus, // Export this for manual auth checks
   };
 
   if (!isInitialized) {
@@ -196,9 +207,12 @@ export const AuthProvider = ({ children }) => {
           justifyContent: "center",
           alignItems: "center",
           height: "100vh",
+          flexDirection: "column",
+          gap: "1rem",
         }}
       >
-        <div>Loading...</div>
+        <div style={{ fontSize: "2rem" }}>🎫</div>
+        <div>Učitavanje aplikacije...</div>
       </div>
     );
   }

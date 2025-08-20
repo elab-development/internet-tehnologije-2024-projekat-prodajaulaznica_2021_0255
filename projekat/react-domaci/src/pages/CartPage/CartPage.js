@@ -82,7 +82,7 @@ const CartPage = () => {
 
     // Navigate to tickets page or show success
     setTimeout(() => {
-      navigate("/profile/tickets");
+      navigate("/tickets");
     }, 2000);
   };
 

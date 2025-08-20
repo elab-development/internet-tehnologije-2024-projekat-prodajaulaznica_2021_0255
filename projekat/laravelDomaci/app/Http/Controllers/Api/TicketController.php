@@ -1046,7 +1046,7 @@ public function generateTicketPDF($id): JsonResponse
     /**
      * Check if ticket can be cancelled
      */
-    private function canCancelTicket(Ticket $ticket): array
+     private function canCancelTicket(Ticket $ticket): array
     {
         $now = now();
         $event = $ticket->event;
@@ -1069,8 +1069,8 @@ public function generateTicketPDF($id): JsonResponse
             ];
         }
 
-        // Check if event has already started
-        if ($event->start_date <= $now) {
+        // ISPRAVKA: Promeni <= u < za konzistentnost sa frontend-om
+        if ($event->start_date < $now) {
             return [
                 'can_cancel' => false,
                 'reason' => 'Cannot cancel ticket for events that have already started',
@@ -1078,7 +1078,7 @@ public function generateTicketPDF($id): JsonResponse
             ];
         }
 
-        // Check cancellation deadline (e.g., 24 hours before event)
+        // Check cancellation deadline (24 hours before event)
         $cancellationDeadline = $event->start_date->copy()->subHours(24);
         if ($now > $cancellationDeadline) {
             return [
@@ -1086,17 +1086,6 @@ public function generateTicketPDF($id): JsonResponse
                 'reason' => 'Cancellation deadline has passed (24 hours before event)',
                 'code' => 'deadline_passed',
                 'deadline' => $cancellationDeadline
-            ];
-        }
-
-        // Check if event is too far in the future (optional business rule)
-        $maxCancellationPeriod = $ticket->purchase_date->copy()->addDays(30);
-        if ($now > $maxCancellationPeriod) {
-            return [
-                'can_cancel' => false,
-                'reason' => 'Cancellation period has expired (30 days after purchase)',
-                'code' => 'period_expired',
-                'expiry_date' => $maxCancellationPeriod
             ];
         }
 

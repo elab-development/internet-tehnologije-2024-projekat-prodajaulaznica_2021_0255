@@ -215,43 +215,6 @@ const QRCodeDisplay = ({ ticket, isOpen, onClose }) => {
 
         {qrCodeData && !loading && (
           <div>
-            {/* Debug info - SIGURNO */}
-            <div
-              style={{
-                fontSize: "0.75rem",
-                color: "#666",
-                marginBottom: "1rem",
-                backgroundColor: "#f0f0f0",
-                padding: "0.5rem",
-                borderRadius: "4px",
-                textAlign: "left",
-              }}
-            >
-              <strong>DEBUG INFO:</strong>
-              <br />
-              QR SVG tip: {typeof qrCodeData.qr_code_svg}
-              <br />
-              QR SVG dužina: {qrCodeData.qr_code_svg?.length || 0} karaktera
-              <br />
-              Je string: {isValidString(qrCodeData.qr_code_svg) ? "DA" : "NE"}
-              <br />
-              Počinje sa SVG:{" "}
-              {isValidString(qrCodeData.qr_code_svg) &&
-              qrCodeData.qr_code_svg.startsWith("<svg")
-                ? "DA"
-                : "NE"}
-              <br />
-              Prva 50 karaktera:{" "}
-              {getStringValue(qrCodeData.qr_code_svg).substring(0, 50)}...
-            </div>
-
-            {/* Test dugme */}
-            <div style={{ marginBottom: "1rem" }}>
-              <Button variant="outline" size="small" onClick={testDirectSVG}>
-                🧪 Test SVG
-              </Button>
-            </div>
-
             {/* Ticket info */}
             <div
               style={{
@@ -359,32 +322,6 @@ const QRCodeDisplay = ({ ticket, isOpen, onClose }) => {
                 Broj karte: <strong>{ticket.ticket_number}</strong>
               </div>
             </div>
-
-            {/* Raw data prikaz */}
-            <details style={{ marginBottom: "2rem", textAlign: "left" }}>
-              <summary style={{ cursor: "pointer", fontWeight: "500" }}>
-                🔍 Sirovi podaci (za debug)
-              </summary>
-              <div
-                style={{
-                  backgroundColor: "#f8fafc",
-                  padding: "1rem",
-                  borderRadius: "6px",
-                  fontSize: "0.75rem",
-                  fontFamily: "monospace",
-                  overflow: "auto",
-                  maxHeight: "300px",
-                  border: "1px solid #e2e8f0",
-                  marginTop: "0.5rem",
-                }}
-              >
-                <strong>QR Code Data:</strong>
-                <br />
-                <pre style={{ margin: 0, whiteSpace: "pre-wrap" }}>
-                  {JSON.stringify(qrCodeData, null, 2)}
-                </pre>
-              </div>
-            </details>
 
             {/* Action buttons */}
             <div

@@ -367,10 +367,38 @@ export const apiService = {
 
   // Export functionality
   exportEvents: async (format = "csv") => {
-    const response = await api.get(`/export/events?format=${format}`, {
-      responseType: "blob",
-    });
-    return response;
+    try {
+      console.log("Calling export with format:", format);
+
+      const response = await api.get(`/events/export?format=${format}`, {
+        responseType: "blob",
+      });
+
+      console.log("Export response received:", response);
+      return response;
+    } catch (error) {
+      console.error("Export API error:", error);
+      console.error("Error response:", error.response);
+      console.error("Error message:", error.message);
+
+      // Detaljnije error handling
+      if (error.response) {
+        // Server je odgovorio sa error status
+        const errorMessage =
+          error.response.data?.message ||
+          error.response.statusText ||
+          "Server error";
+        throw new Error(
+          `Server error (${error.response.status}): ${errorMessage}`
+        );
+      } else if (error.request) {
+        // Request je poslat ali nema odgovora
+        throw new Error("Nema odgovora sa servera. Proverite konekciju.");
+      } else {
+        // Nešto drugo
+        throw new Error(error.message || "Nepoznata greška pri eksportu");
+      }
+    }
   },
 
   exportTickets: async (eventId = null, format = "csv") => {

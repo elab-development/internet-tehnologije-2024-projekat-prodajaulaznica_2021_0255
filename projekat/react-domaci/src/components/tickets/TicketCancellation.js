@@ -19,22 +19,54 @@ const TicketCancellation = ({ ticket, isOpen, onClose, onSuccess }) => {
 
   const loadCancellationInfo = async () => {
     try {
-      // Get cancellation info from ticket data or API
-      if (ticket.can_be_cancelled) {
-        setCancellationInfo(
-          ticket.cancellation_info || {
-            can_cancel: true,
-            hours_until_event: 48,
-            cancellation_fee_percentage: 10,
-            refund_percentage: 90,
-            estimated_refund: ticket.price * 0.9,
-            cancellation_fee: ticket.price * 0.1,
-          }
+      // Koristi istu logiku kao u UserTicketsDashboard
+      const now = new Date();
+      const eventStart = new Date(ticket.event?.start_date);
+      const canCancel = ticket.status === "active" && eventStart > now;
+
+      if (canCancel) {
+        // Izračunaj sate do događaja
+        const hoursUntilEvent = Math.floor(
+          (eventStart - now) / (1000 * 60 * 60)
         );
+
+        // Izračunaj naknadu na osnovu vremena
+        let cancellationFeePercentage = 10;
+        let refundPercentage = 90;
+
+        if (hoursUntilEvent >= 168) {
+          // 7+ dana
+          cancellationFeePercentage = 5;
+          refundPercentage = 95;
+        } else if (hoursUntilEvent >= 72) {
+          // 3-7 dana
+          cancellationFeePercentage = 10;
+          refundPercentage = 90;
+        } else if (hoursUntilEvent >= 24) {
+          // 1-3 dana
+          cancellationFeePercentage = 20;
+          refundPercentage = 80;
+        } else {
+          // Manje od 24h
+          cancellationFeePercentage = 100;
+          refundPercentage = 0;
+        }
+
+        setCancellationInfo({
+          can_cancel: hoursUntilEvent >= 24, // Mora biti bar 24h unapred
+          hours_until_event: hoursUntilEvent,
+          cancellation_fee_percentage: cancellationFeePercentage,
+          refund_percentage: refundPercentage,
+          estimated_refund: ticket.price * (refundPercentage / 100),
+          cancellation_fee: ticket.price * (cancellationFeePercentage / 100),
+        });
       } else {
         setCancellationInfo({
           can_cancel: false,
-          reason: "Ticket cannot be cancelled at this time",
+          reason:
+            ticket.status !== "active"
+              ? `Ticket status is: ${ticket.status}`
+              : "Event has already started",
         });
       }
     } catch (err) {

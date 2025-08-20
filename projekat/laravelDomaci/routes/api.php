@@ -21,6 +21,11 @@ Route::middleware(['api.errors', 'api.response'])->group(function () {
     Route::post('login', [AuthController::class, 'login']);
 
     // Public access to events (read-only)
+
+    // Export ruta - CSV & HTML u Admin panelu
+    Route::get('events/export', [EventController::class, 'exportEvents']);
+
+    // Ostatak Event ruta
     Route::get('events', [EventController::class, 'index']);
     Route::get('events/{id}', [EventController::class, 'show']);
     Route::get('events/category/{categoryId}', [EventController::class, 'getEventsByCategory']);
@@ -45,8 +50,11 @@ Route::middleware(['api.errors', 'api.response'])->group(function () {
     Route::delete('queue/leave', [QueueController::class, 'leaveQueue']);
     Route::get('queue/stats', [QueueController::class, 'getQueueStats']);
 
+
+
     // Protected routes (authentication required)
     Route::middleware('auth:sanctum')->group(function () {
+        
         // Auth routes
         Route::post('logout', [AuthController::class, 'logout']);
         Route::post('refresh', [AuthController::class, 'refresh']);
@@ -60,6 +68,8 @@ Route::middleware(['api.errors', 'api.response'])->group(function () {
             Route::get('dashboard/top-events', [AdminDashboardController::class, 'getTopEvents']);
             Route::get('dashboard/recent-activity', [AdminDashboardController::class, 'getRecentActivity']);
             Route::get('dashboard/upcoming-events', [AdminDashboardController::class, 'getUpcomingEvents']);
+
+
 
             // Admin queue management - DODAJ OVE RUTE
             Route::prefix('queue')->group(function () {

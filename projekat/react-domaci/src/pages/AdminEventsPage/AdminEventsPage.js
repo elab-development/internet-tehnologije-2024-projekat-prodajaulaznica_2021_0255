@@ -88,11 +88,19 @@ const AdminEventsPage = () => {
 
   const handleExport = async (format) => {
     try {
+      console.log("Starting export with format:", format);
       setExporting(true);
+
       const response = await apiService.exportEvents(format);
+      console.log("Export response type:", typeof response);
+      console.log("Export response size:", response?.size || "unknown");
+
+      if (!response || response.size === 0) {
+        throw new Error("Prazan odgovor sa servera");
+      }
 
       // Create download link
-      const url = window.URL.createObjectURL(new Blob([response]));
+      const url = window.URL.createObjectURL(response);
       const link = document.createElement("a");
       link.href = url;
       link.setAttribute(
@@ -103,7 +111,12 @@ const AdminEventsPage = () => {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
+
+      alert(
+        `Događaji su uspešno eksportovani u ${format.toUpperCase()} format!`
+      );
     } catch (error) {
+      console.error("Export error details:", error);
       alert("Greška pri eksportu: " + error.message);
     } finally {
       setExporting(false);
@@ -313,7 +326,8 @@ const AdminEventsPage = () => {
                       <td style={{ padding: "1rem" }}>
                         <div>
                           <strong>{event.name}</strong>
-                          {event.featured && (
+                          {/* 🔧 ISPRAVKA - eksplicitno proverite boolean */}
+                          {Boolean(event.featured) && event.featured !== 0 && (
                             <span
                               style={{
                                 marginLeft: "0.5rem",

@@ -800,6 +800,359 @@ class EventController extends Controller
             'data' => null
         ], 500);
     }
+
+    
+
 }
 
+/**
+     * @OA\Get(
+     *     path="/api/events/export",
+     *     summary="Export events to CSV or HTML format",
+     *     tags={"Events"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="format",
+     *         in="query",
+     *         description="Export format (csv or html)",
+     *         required=false,
+     *         @OA\Schema(type="string", enum={"csv", "html"}, default="csv")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="File download",
+     *         @OA\MediaType(
+     *             mediaType="text/csv",
+     *             @OA\Schema(type="string", format="binary")
+     *         )
+     *     ),
+     *     @OA\Response(response=403, description="Unauthorized - Admin access required"),
+     *     @OA\Response(response=400, description="Unsupported format")
+     * )
+     */
+    public function exportEvents(Request $request)
+    {
+        // Proveri da li je korisnik admin
+        if (!auth()->check() || !auth()->user()->is_admin) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. Admin access required.'
+            ], 403);
+        }
+
+        $format = $request->get('format', 'csv');
+        
+        // Učitajte sve događaje sa kategorijama
+        $events = Event::with('category')->orderBy('created_at', 'desc')->get();
+        
+        switch ($format) {
+            case 'csv':
+                return $this->exportEventsToCsv($events);
+            case 'html':
+                return $this->exportEventsToHtml($events);
+            default:
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unsupported format. Use csv or html.'
+                ], 400);
+        }
+    }
+
+    /**
+     * Export events to CSV format
+     */
+    private function exportEventsToCsv($events)
+    {
+        $filename = 'events_' . date('Y-m-d_H-i-s') . '.csv';
+        
+        $headers = [
+            'Content-Type' => 'text/csv; charset=utf-8',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Cache-Control' => 'no-cache, no-store, must-revalidate',
+            'Pragma' => 'no-cache',
+            'Expires' => '0'
+        ];
+        
+        $callback = function() use ($events) {
+            $file = fopen('php://output', 'w');
+            
+            // UTF-8 BOM za Excel kompatibilnost
+            fwrite($file, "\xEF\xBB\xBF");
+            
+            // Header red
+            fputcsv($file, [
+                'ID',
+                'Naziv',
+                'Opis',
+                'Kategorija',
+                'Lokacija',
+                'Datum početka',
+                'Datum završetka',
+                'Cena (RSD)',
+                'Ukupno karata',
+                'Dostupne karte',
+                'Prodane karte',
+                'Popularno',
+                'Status',
+                'Kreiran',
+                'Ažuriran'
+            ]);
+            
+            // Podaci
+            foreach ($events as $event) {
+                fputcsv($file, [
+                    $event->id,
+                    $event->name,
+                    strip_tags($event->description),
+                    $event->category ? $event->category->name : 'N/A',
+                    $event->location,
+                    $event->start_date->format('d.m.Y H:i'),
+                    $event->end_date->format('d.m.Y H:i'),
+                    number_format($event->price, 2, ',', '.'),
+                    $event->total_tickets,
+                    $event->available_tickets,
+                    $event->sold_tickets,
+                    $event->featured ? 'Da' : 'Ne',
+                    $event->isActive() ? 'Aktivan' : 'Završen',
+                    $event->created_at->format('d.m.Y H:i'),
+                    $event->updated_at->format('d.m.Y H:i')
+                ]);
+            }
+            
+            fclose($file);
+        };
+        
+        return response()->stream($callback, 200, $headers);
+    }
+
+    /**
+     * Export events to HTML format
+     */
+    private function exportEventsToHtml($events)
+    {
+        $filename = 'events_' . date('Y-m-d_H-i-s') . '.html';
+        
+        $html = '<!DOCTYPE html>
+<html lang="sr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Izvoz događaja - ' . date('d.m.Y H:i') . '</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            background-color: #f8f9fa;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 { 
+            color: #333; 
+            text-align: center; 
+            margin-bottom: 10px;
+            border-bottom: 3px solid #007bff;
+            padding-bottom: 10px;
+        }
+        .export-info { 
+            text-align: center; 
+            margin-bottom: 30px; 
+            color: #666; 
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .stat-item {
+            background: #007bff;
+            color: white;
+            padding: 15px;
+            border-radius: 5px;
+            min-width: 120px;
+        }
+        .stat-number {
+            font-size: 24px;
+            font-weight: bold;
+            display: block;
+        }
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-top: 20px;
+            font-size: 14px;
+        }
+        th, td { 
+            border: 1px solid #ddd; 
+            padding: 12px; 
+            text-align: left; 
+        }
+        th { 
+            background-color: #007bff; 
+            color: white;
+            font-weight: bold; 
+            position: sticky;
+            top: 0;
+        }
+        tr:nth-child(even) { 
+            background-color: #f9f9f9; 
+        }
+        tr:hover {
+            background-color: #e3f2fd;
+        }
+        .price { text-align: right; font-weight: bold; }
+        .center { text-align: center; }
+        .status-active { 
+            color: #28a745; 
+            font-weight: bold;
+            background: #d4edda;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+        .status-ended { 
+            color: #6c757d;
+            background: #f8f9fa;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+        .featured-row { 
+            background-color: #fff3cd !important;
+            border-left: 4px solid #ffc107;
+        }
+        .category-badge { 
+            padding: 4px 8px; 
+            border-radius: 4px; 
+            color: white; 
+            font-size: 12px;
+            display: inline-block;
+            font-weight: bold;
+        }
+        .event-name {
+            font-weight: bold;
+            color: #333;
+        }
+        .featured-star {
+            color: #ffc107;
+            font-size: 16px;
+            margin-left: 5px;
+        }
+        .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+        }
+        @media print {
+            body { margin: 0; }
+            .container { box-shadow: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Izvoz događaja</h1>
+        <div class="export-info">
+            <p><strong>Generisan:</strong> ' . date('d.m.Y H:i:s') . '</p>
+            <div class="stats">
+                <div class="stat-item">
+                    <span class="stat-number">' . count($events) . '</span>
+                    <span>Ukupno događaja</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">' . $events->where('featured', true)->count() . '</span>
+                    <span>Popularni</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">' . $events->filter(function($e) { return $e->isActive(); })->count() . '</span>
+                    <span>Aktivni</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">' . number_format($events->sum('sold_tickets')) . '</span>
+                    <span>Prodane karte</span>
+                </div>
+            </div>
+        </div>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Naziv događaja</th>
+                    <th>Kategorija</th>
+                    <th>Lokacija</th>
+                    <th>Datum početka</th>
+                    <th>Datum završetka</th>
+                    <th>Cena</th>
+                    <th>Karte (D/U/P)</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>';
+        
+        foreach ($events as $event) {
+            $statusClass = $event->isActive() ? 'status-active' : 'status-ended';
+            $statusText = $event->isActive() ? 'Aktivan' : 'Završen';
+            $rowClass = $event->featured ? 'featured-row' : '';
+            
+            $html .= '<tr class="' . $rowClass . '">
+                <td class="center">' . $event->id . '</td>
+                <td>
+                    <span class="event-name">' . htmlspecialchars($event->name) . '</span>
+                    ' . ($event->featured ? '<span class="featured-star">★</span>' : '') . '
+                </td>
+                <td>
+                    <span class="category-badge" style="background-color: ' . ($event->category->color ?? '#3498db') . '">
+                        ' . htmlspecialchars($event->category ? $event->category->name : 'N/A') . '
+                    </span>
+                </td>
+                <td>📍 ' . htmlspecialchars($event->location) . '</td>
+                <td>' . $event->start_date->format('d.m.Y H:i') . '</td>
+                <td>' . $event->end_date->format('d.m.Y H:i') . '</td>
+                <td class="price">' . number_format($event->price, 2, ',', '.') . ' RSD</td>
+                <td class="center">
+                    <strong>' . $event->available_tickets . '</strong> / 
+                    ' . $event->total_tickets . ' / 
+                    <span style="color: #28a745;">' . $event->sold_tickets . '</span>
+                </td>
+                <td class="center">
+                    <span class="' . $statusClass . '">' . $statusText . '</span>
+                </td>
+            </tr>';
+        }
+        
+        $html .= '</tbody>
+        </table>
+        
+        <div class="footer">
+            <p><strong>Legenda:</strong></p>
+            <p>★ - Popularni događaji | D/U/P - Dostupne / Ukupno / Prodane karte</p>
+            <p>📍 - Lokacija | 📊 - Izvoz generisan automatski</p>
+            <hr style="margin: 15px 0;">
+            <p>© ' . date('Y') . ' Event Management System</p>
+        </div>
+    </div>
+</body>
+</html>';
+        
+        $headers = [
+            'Content-Type' => 'text/html; charset=utf-8',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Cache-Control' => 'no-cache, no-store, must-revalidate',
+            'Pragma' => 'no-cache',
+            'Expires' => '0'
+        ];
+        
+        return response($html, 200, $headers);
+    }
 }

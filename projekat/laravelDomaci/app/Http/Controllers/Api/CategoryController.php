@@ -15,30 +15,41 @@ class CategoryController extends Controller
 {
     /**
      * @OA\Tag(
-     * name="Categories",
-     * description="Operations related to category management"
+     *     name="Categories",
+     *     description="Operations related to category management"
      * )
      */
     
     /**
      * @OA\Get(
-     * path="/api/categories",
-     * summary="Get all categories with active event count, sorted by name",
-     * tags={"Categories"},
-     * @OA\Response(
-     * response=200,
-     * description="List of categories",
-     * @OA\JsonContent(
-     * type="object",
-     * @OA\Property(property="success", type="boolean", example=true),
-     * @OA\Property(property="message", type="string", example="Categories retrieved successfully"),
-     * @OA\Property(
-     * property="data",
-     * type="array",
-     * @OA\Items(ref="#/components/schemas/CategoryResource")
-     * )
-     * )
-     * )
+     *     path="/api/categories",
+     *     summary="Get all categories with active event count",
+     *     description="Retrieve all categories sorted by name with count of active events (events with end_date > current date)",
+     *     operationId="getCategoriesIndex",
+     *     tags={"Categories"},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Categories retrieved successfully",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Categories retrieved successfully"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(ref="#/components/schemas/CategoryResource")
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Internal server error",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Internal server error")
+     *         )
+     *     )
      * )
      */
     public function index(): JsonResponse
@@ -56,24 +67,54 @@ class CategoryController extends Controller
 
     /**
      * @OA\Post(
-     * path="/api/categories",
-     * summary="Create a new category",
-     * tags={"Categories"},
-     * security={{"bearerAuth":{}}},
-     * @OA\RequestBody(
-     * required=true,
-     * @OA\JsonContent(
-     * required={"name", "description", "color"},
-     * @OA\Property(property="name", type="string", example="Music"),
-     * @OA\Property(property="description", type="string", example="Concerts and musical events"),
-     * @OA\Property(property="color", type="string", example="#FF5733")
-     * )
-     * ),
-     * @OA\Response(
-     * response=201,
-     * description="Category created successfully"
-     * ),
-     * @OA\Response(response=422, description="Validation failed")
+     *     path="/api/categories",
+     *     summary="Create a new category",
+     *     description="Create a new category with name, description and color. Requires authentication.",
+     *     operationId="createCategory",
+     *     tags={"Categories"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         description="Category data",
+     *         @OA\JsonContent(
+     *             required={"name", "description", "color"},
+     *             @OA\Property(property="name", type="string", maxLength=255, example="Music", description="Category name"),
+     *             @OA\Property(property="description", type="string", example="Concerts and musical events", description="Category description"),
+     *             @OA\Property(property="color", type="string", maxLength=7, pattern="^#[0-9A-Fa-f]{6}$", example="#FF5733", description="Hex color code")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=201,
+     *         description="Category created successfully",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="message", type="string", example="Category created successfully"),
+     *             @OA\Property(property="category", ref="#/components/schemas/CategoryResource")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validation failed",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="message", type="string", example="The given data was invalid."),
+     *             @OA\Property(
+     *                 property="errors",
+     *                 type="object",
+     *                 @OA\Property(property="name", type="array", @OA\Items(type="string")),
+     *                 @OA\Property(property="description", type="array", @OA\Items(type="string")),
+     *                 @OA\Property(property="color", type="array", @OA\Items(type="string"))
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Unauthorized",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="message", type="string", example="Unauthenticated.")
+     *         )
+     *     )
      * )
      */
     public function store(Request $request): JsonResponse
@@ -94,26 +135,38 @@ class CategoryController extends Controller
 
     /**
      * @OA\Get(
-     * path="/api/categories/{id}",
-     * summary="Get a specific category with its active events",
-     * tags={"Categories"},
-     * @OA\Parameter(
-     * name="id",
-     * in="path",
-     * required=true,
-     * @OA\Schema(type="integer")
-     * ),
-     * @OA\Response(
-     * response=200,
-     * description="Category found",
-     * @OA\JsonContent(
-     * type="object",
-     * @OA\Property(property="success", type="boolean", example=true),
-     * @OA\Property(property="message", type="string", example="Category retrieved successfully"),
-     * @OA\Property(property="data", ref="#/components/schemas/CategoryResource")
-     * )
-     * ),
-     * @OA\Response(response=404, description="Category not found")
+     *     path="/api/categories/{id}",
+     *     summary="Get a specific category with its active events",
+     *     description="Retrieve a specific category by ID with its active events (end_date > current date) ordered by start_date",
+     *     operationId="getCategoryById",
+     *     tags={"Categories"},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="Category ID",
+     *         @OA\Schema(type="integer", minimum=1, example=1)
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Category retrieved successfully",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Category retrieved successfully"),
+     *             @OA\Property(property="data", ref="#/components/schemas/CategoryResource")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Category not found",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Category not found"),
+     *             @OA\Property(property="data", type="null", example=null)
+     *         )
+     *     )
      * )
      */
     public function show($id): JsonResponse
@@ -140,25 +193,67 @@ class CategoryController extends Controller
 
     /**
      * @OA\Put(
-     * path="/api/categories/{id}",
-     * summary="Update an existing category",
-     * tags={"Categories"},
-     * security={{"bearerAuth":{}}},
-     * @OA\Parameter(
-     * name="id",
-     * in="path",
-     * required=true,
-     * @OA\Schema(type="integer")
-     * ),
-     * @OA\RequestBody(
-     * @OA\JsonContent(
-     * @OA\Property(property="name", type="string", example="Updated Category"),
-     * @OA\Property(property="description", type="string", example="Updated description"),
-     * @OA\Property(property="color", type="string", example="#123456")
-     * )
-     * ),
-     * @OA\Response(response=200, description="Category updated successfully"),
-     * @OA\Response(response=422, description="Validation error")
+     *     path="/api/categories/{id}",
+     *     summary="Update an existing category",
+     *     description="Update category details. All fields are optional. Name must be unique. Requires authentication.",
+     *     operationId="updateCategory",
+     *     tags={"Categories"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="Category ID to update",
+     *         @OA\Schema(type="integer", minimum=1, example=1)
+     *     ),
+     *     @OA\RequestBody(
+     *         required=false,
+     *         description="Category update data (all fields optional)",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="name", type="string", maxLength=255, example="Updated Category", description="Category name (must be unique)"),
+     *             @OA\Property(property="description", type="string", example="Updated description", description="Category description"),
+     *             @OA\Property(property="color", type="string", maxLength=7, pattern="^#[0-9A-Fa-f]{6}$", example="#123456", description="Hex color code")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Category updated successfully",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="message", type="string", example="Category updated successfully"),
+     *             @OA\Property(property="category", ref="#/components/schemas/CategoryResource")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Category not found",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="message", type="string", example="No query results for model [App\\Models\\Category]")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validation error",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="message", type="string", example="The given data was invalid."),
+     *             @OA\Property(
+     *                 property="errors",
+     *                 type="object",
+     *                 @OA\Property(property="name", type="array", @OA\Items(type="string")),
+     *                 @OA\Property(property="color", type="array", @OA\Items(type="string"))
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Unauthorized",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="message", type="string", example="Unauthenticated.")
+     *         )
+     *     )
      * )
      */
     public function update(Request $request, $id): JsonResponse
@@ -181,18 +276,51 @@ class CategoryController extends Controller
 
     /**
      * @OA\Delete(
-     * path="/api/categories/{id}",
-     * summary="Delete a category",
-     * tags={"Categories"},
-     * security={{"bearerAuth":{}}},
-     * @OA\Parameter(
-     * name="id",
-     * in="path",
-     * required=true,
-     * @OA\Schema(type="integer")
-     * ),
-     * @OA\Response(response=200, description="Category deleted successfully"),
-     * @OA\Response(response=422, description="Cannot delete category with associated events")
+     *     path="/api/categories/{id}",
+     *     summary="Delete a category",
+     *     description="Delete a category if it has no associated events. Requires authentication.",
+     *     operationId="deleteCategory",
+     *     tags={"Categories"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="Category ID to delete",
+     *         @OA\Schema(type="integer", minimum=1, example=1)
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Category deleted successfully",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="message", type="string", example="Category deleted successfully")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Category not found",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="message", type="string", example="No query results for model [App\\Models\\Category]")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Cannot delete category with associated events",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="message", type="string", example="Cannot delete category with associated events")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Unauthorized",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="message", type="string", example="Unauthenticated.")
+     *         )
+     *     )
      * )
      */
     public function destroy($id): JsonResponse
@@ -214,43 +342,62 @@ class CategoryController extends Controller
 
     /**
      * @OA\Get(
-     * path="/api/categories/{id}/events",
-     * summary="Get paginated list of active events for a specific category",
-     * tags={"Categories"},
-     * @OA\Parameter(
-     * name="id",
-     * in="path",
-     * required=true,
-     * @OA\Schema(type="integer")
-     * ),
-     * @OA\Response(
-     * response=200,
-     * description="Paginated list of events in the category",
-     * @OA\JsonContent(
-     * type="object",
-     * @OA\Property(property="success", type="boolean", example=true),
-     * @OA\Property(property="message", type="string", example="Category events retrieved successfully"),
-     * @OA\Property(
-     * property="data",
-     * type="object",
-     * @OA\Property(property="category", ref="#/components/schemas/CategoryResource"),
-     * @OA\Property(
-     * property="events",
-     * type="object",
-     * @OA\Property(
-     * property="data",
-     * type="array",
-     * @OA\Items(ref="#/components/schemas/EventResource")
-     * ),
-     * @OA\Property(property="current_page", type="integer", example=1),
-     * @OA\Property(property="last_page", type="integer", example=3),
-     * @OA\Property(property="per_page", type="integer", example=12),
-     * @OA\Property(property="total", type="integer", example=30)
-     * )
-     * )
-     * )
-     * ),
-     * @OA\Response(response=404, description="Category not found")
+     *     path="/api/categories/{id}/events",
+     *     summary="Get paginated list of active events for a specific category",
+     *     description="Retrieve paginated active events (end_date > current date) for a specific category, ordered by start_date ascending. Returns 12 events per page.",
+     *     operationId="getCategoryEvents",
+     *     tags={"Categories"},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="Category ID",
+     *         @OA\Schema(type="integer", minimum=1, example=1)
+     *     ),
+     *     @OA\Parameter(
+     *         name="page",
+     *         in="query",
+     *         required=false,
+     *         description="Page number for pagination",
+     *         @OA\Schema(type="integer", minimum=1, default=1, example=1)
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Category events retrieved successfully",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Category events retrieved successfully"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 @OA\Property(property="category", ref="#/components/schemas/CategoryResource"),
+     *                 @OA\Property(
+     *                     property="events",
+     *                     type="object",
+     *                     @OA\Property(
+     *                         property="data",
+     *                         type="array",
+     *                         @OA\Items(ref="#/components/schemas/EventResource")
+     *                     ),
+     *                     @OA\Property(property="current_page", type="integer", example=1, description="Current page number"),
+     *                     @OA\Property(property="last_page", type="integer", example=3, description="Last page number"),
+     *                     @OA\Property(property="per_page", type="integer", example=12, description="Items per page"),
+     *                     @OA\Property(property="total", type="integer", example=30, description="Total number of events")
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Category not found",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Category not found"),
+     *             @OA\Property(property="data", type="null", example=null)
+     *         )
+     *     )
      * )
      */
     public function getEvents($id): JsonResponse
@@ -289,39 +436,51 @@ class CategoryController extends Controller
 
     /**
      * @OA\Get(
-     * path="/api/categories/{id}/statistics",
-     * summary="Get statistics for a specific category",
-     * tags={"Categories"},
-     * @OA\Parameter(
-     * name="id",
-     * in="path",
-     * required=true,
-     * @OA\Schema(type="integer")
-     * ),
-     * @OA\Response(
-     * response=200,
-     * description="Category statistics retrieved successfully",
-     * @OA\JsonContent(
-     * type="object",
-     * @OA\Property(property="success", type="boolean", example=true),
-     * @OA\Property(property="message", type="string", example="Category statistics retrieved successfully"),
-     * @OA\Property(
-     * property="data",
-     * type="object",
-     * @OA\Property(property="category", ref="#/components/schemas/CategoryResource"),
-     * @OA\Property(
-     * property="statistics",
-     * type="object",
-     * @OA\Property(property="total_events", type="integer", example=50),
-     * @OA\Property(property="active_events", type="integer", example=15),
-     * @OA\Property(property="total_tickets_sold", type="integer", example=1200),
-     * @OA\Property(property="upcoming_events", type="integer", example=5),
-     * @OA\Property(property="average_price", type="number", format="float", example=25.50)
-     * )
-     * )
-     * )
-     * ),
-     * @OA\Response(response=404, description="Category not found")
+     *     path="/api/categories/{id}/statistics",
+     *     summary="Get comprehensive statistics for a specific category",
+     *     description="Retrieve detailed statistics for a category including total events, active events, ticket sales, upcoming events, and average price",
+     *     operationId="getCategoryStatistics",
+     *     tags={"Categories"},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="Category ID",
+     *         @OA\Schema(type="integer", minimum=1, example=1)
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Category statistics retrieved successfully",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Category statistics retrieved successfully"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 @OA\Property(property="category", ref="#/components/schemas/CategoryResource"),
+     *                 @OA\Property(
+     *                     property="statistics",
+     *                     type="object",
+     *                     @OA\Property(property="total_events", type="integer", example=50, description="Total number of events in this category"),
+     *                     @OA\Property(property="active_events", type="integer", example=15, description="Number of active events (end_date > now)"),
+     *                     @OA\Property(property="total_tickets_sold", type="integer", example=1200, description="Total active tickets sold for this category"),
+     *                     @OA\Property(property="upcoming_events", type="integer", example=5, description="Number of upcoming events (start_date > now)"),
+     *                     @OA\Property(property="average_price", type="number", format="float", example=25.50, nullable=true, description="Average price of active events in this category")
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Category not found",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Category not found"),
+     *             @OA\Property(property="data", type="null", example=null)
+     *         )
+     *     )
      * )
      */
     public function getStatistics($id): JsonResponse

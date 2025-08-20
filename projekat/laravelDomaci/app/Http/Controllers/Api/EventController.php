@@ -8,125 +8,136 @@ use App\Models\Event;
 use App\Models\Category;
 use Illuminate\Http\JsonResponse;
 use App\Http\Resources\EventResource;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Str;
 
 class EventController extends Controller
 {
     /**
      * @OA\Get(
-     * path="/api/events",
-     * summary="Get a list of events with filtering, sorting, and pagination",
-     * tags={"Events"},
-     * @OA\Parameter(
-     * name="search",
-     * in="query",
-     * description="Search term for event name, location, description, or category name",
-     * required=false,
-     * @OA\Schema(type="string")
-     * ),
-     * @OA\Parameter(
-     * name="category_id",
-     * in="query",
-     * description="Filter events by category ID",
-     * required=false,
-     * @OA\Schema(type="integer")
-     * ),
-     * @OA\Parameter(
-     * name="min_price",
-     * in="query",
-     * description="Filter events by minimum price",
-     * required=false,
-     * @OA\Schema(type="number", format="float")
-     * ),
-     * @OA\Parameter(
-     * name="max_price",
-     * in="query",
-     * description="Filter events by maximum price",
-     * required=false,
-     * @OA\Schema(type="number", format="float")
-     * ),
-     * @OA\Parameter(
-     * name="start_date",
-     * in="query",
-     * description="Filter events by start date (format: YYYY-MM-DD)",
-     * required=false,
-     * @OA\Schema(type="string", format="date")
-     * ),
-     * @OA\Parameter(
-     * name="end_date",
-     * in="query",
-     * description="Filter events by end date (format: YYYY-MM-DD)",
-     * required=false,
-     * @OA\Schema(type="string", format="date")
-     * ),
-     * @OA\Parameter(
-     * name="location",
-     * in="query",
-     * description="Filter events by location (partial match)",
-     * required=false,
-     * @OA\Schema(type="string")
-     * ),
-     * @OA\Parameter(
-     * name="available_only",
-     * in="query",
-     * description="Filter to show only events with available tickets",
-     * required=false,
-     * @OA\Schema(type="string", enum={"true"})
-     * ),
-     * @OA\Parameter(
-     * name="featured",
-     * in="query",
-     * description="Filter to show only featured events",
-     * required=false,
-     * @OA\Schema(type="string", enum={"true"})
-     * ),
-     * @OA\Parameter(
-     * name="active_only",
-     * in="query",
-     * description="Filter to show only events that have not yet ended",
-     * required=false,
-     * @OA\Schema(type="string", enum={"true"})
-     * ),
-     * @OA\Parameter(
-     * name="sort_by",
-     * in="query",
-     * description="Field to sort by",
-     * required=false,
-     * @OA\Schema(type="string", enum={"start_date", "price", "name", "created_at", "available_tickets"})
-     * ),
-     * @OA\Parameter(
-     * name="sort_order",
-     * in="query",
-     * description="Sort direction",
-     * required=false,
-     * @OA\Schema(type="string", enum={"asc", "desc"})
-     * ),
-     * @OA\Parameter(
-     * name="per_page",
-     * in="query",
-     * description="Number of events per page",
-     * required=false,
-     * @OA\Schema(type="integer", example=6)
-     * ),
-     * @OA\Response(
-     * response=200,
-     * description="Successful operation",
-     * @OA\JsonContent(
-     * @OA\Property(property="success", type="boolean", example=true),
-     * @OA\Property(property="message", type="string", example="Events retrieved successfully"),
-     * @OA\Property(property="data", type="object",
-     * @OA\Property(property="data", type="array",
-     * @OA\Items(ref="#/components/schemas/EventResource")
-     * ),
-     * @OA\Property(property="current_page", type="integer", example=1),
-     * @OA\Property(property="last_page", type="integer", example=5),
-     * @OA\Property(property="per_page", type="integer", example=6),
-     * @OA\Property(property="total", type="integer", example=25),
-     * @OA\Property(property="from", type="integer", example=1),
-     * @OA\Property(property="to", type="integer", example=6),
-     * @OA\Property(property="has_more_pages", type="boolean", example=true)
-     * )
-     * )
-     * )
+     *     path="/api/events",
+     *     summary="Get a list of events with filtering, sorting, and pagination",
+     *     tags={"Events"},
+     *     @OA\Parameter(
+     *         name="search",
+     *         in="query",
+     *         description="Search term for event name, location, description, or category name",
+     *         required=false,
+     *         @OA\Schema(type="string")
+     *     ),
+     *     @OA\Parameter(
+     *         name="category_id",
+     *         in="query",
+     *         description="Filter events by category ID",
+     *         required=false,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Parameter(
+     *         name="min_price",
+     *         in="query",
+     *         description="Filter events by minimum price",
+     *         required=false,
+     *         @OA\Schema(type="number", format="float")
+     *     ),
+     *     @OA\Parameter(
+     *         name="max_price",
+     *         in="query",
+     *         description="Filter events by maximum price",
+     *         required=false,
+     *         @OA\Schema(type="number", format="float")
+     *     ),
+     *     @OA\Parameter(
+     *         name="start_date",
+     *         in="query",
+     *         description="Filter events by start date (format: YYYY-MM-DD)",
+     *         required=false,
+     *         @OA\Schema(type="string", format="date")
+     *     ),
+     *     @OA\Parameter(
+     *         name="end_date",
+     *         in="query",
+     *         description="Filter events by end date (format: YYYY-MM-DD)",
+     *         required=false,
+     *         @OA\Schema(type="string", format="date")
+     *     ),
+     *     @OA\Parameter(
+     *         name="location",
+     *         in="query",
+     *         description="Filter events by location (partial match)",
+     *         required=false,
+     *         @OA\Schema(type="string")
+     *     ),
+     *     @OA\Parameter(
+     *         name="available_only",
+     *         in="query",
+     *         description="Filter to show only events with available tickets",
+     *         required=false,
+     *         @OA\Schema(type="string", enum={"true"})
+     *     ),
+     *     @OA\Parameter(
+     *         name="featured",
+     *         in="query",
+     *         description="Filter to show only featured events",
+     *         required=false,
+     *         @OA\Schema(type="string", enum={"true"})
+     *     ),
+     *     @OA\Parameter(
+     *         name="active_only",
+     *         in="query",
+     *         description="Filter to show only events that have not yet ended",
+     *         required=false,
+     *         @OA\Schema(type="string", enum={"true"})
+     *     ),
+     *     @OA\Parameter(
+     *         name="sort_by",
+     *         in="query",
+     *         description="Field to sort by",
+     *         required=false,
+     *         @OA\Schema(type="string", enum={"start_date", "price", "name", "created_at", "available_tickets"})
+     *     ),
+     *     @OA\Parameter(
+     *         name="sort_order",
+     *         in="query",
+     *         description="Sort direction",
+     *         required=false,
+     *         @OA\Schema(type="string", enum={"asc", "desc"})
+     *     ),
+     *     @OA\Parameter(
+     *         name="per_page",
+     *         in="query",
+     *         description="Number of events per page (max 50)",
+     *         required=false,
+     *         @OA\Schema(type="integer", example=6, maximum=50)
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Successful operation",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Events retrieved successfully"),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="data", type="array",
+     *                     @OA\Items(ref="#/components/schemas/EventResource")
+     *                 ),
+     *                 @OA\Property(property="current_page", type="integer", example=1),
+     *                 @OA\Property(property="last_page", type="integer", example=5),
+     *                 @OA\Property(property="per_page", type="integer", example=6),
+     *                 @OA\Property(property="total", type="integer", example=25),
+     *                 @OA\Property(property="from", type="integer", example=1),
+     *                 @OA\Property(property="to", type="integer", example=6),
+     *                 @OA\Property(property="has_more_pages", type="boolean", example=true)
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Internal server error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Error retrieving events")
+     *         )
+     *     )
      * )
      */
     public function index(Request $request): JsonResponse
@@ -222,30 +233,39 @@ class EventController extends Controller
 
     /**
      * @OA\Get(
-     * path="/api/events/suggestions",
-     * summary="Get search suggestions based on a search term",
-     * tags={"Events"},
-     * @OA\Parameter(
-     * name="term",
-     * in="query",
-     * required=true,
-     * description="The search term to get suggestions for",
-     * @OA\Schema(type="string")
-     * ),
-     * @OA\Response(
-     * response=200,
-     * description="Suggestions retrieved successfully",
-     * @OA\JsonContent(
-     * @OA\Property(property="success", type="boolean", example=true),
-     * @OA\Property(property="data", type="array",
-     * @OA\Items(
-     * @OA\Property(property="type", type="string", example="event"),
-     * @OA\Property(property="value", type="string", example="Concert in the Park"),
-     * @OA\Property(property="label", type="string", example="Concert in the Park")
-     * )
-     * )
-     * )
-     * )
+     *     path="/api/events/suggestions",
+     *     summary="Get search suggestions based on a search term",
+     *     description="Returns autocomplete suggestions for events, locations, and categories based on the provided search term",
+     *     tags={"Events"},
+     *     @OA\Parameter(
+     *         name="term",
+     *         in="query",
+     *         required=true,
+     *         description="The search term to get suggestions for (minimum 2 characters)",
+     *         @OA\Schema(type="string", minLength=2)
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Suggestions retrieved successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="data", type="array",
+     *                 @OA\Items(
+     *                     @OA\Property(property="type", type="string", enum={"event", "location", "category"}, example="event"),
+     *                     @OA\Property(property="value", type="string", example="Concert in the Park"),
+     *                     @OA\Property(property="label", type="string", example="Concert in the Park")
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=400,
+     *         description="Invalid search term",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Search term must be at least 2 characters")
+     *         )
+     *     )
      * )
      */
     public function searchSuggestions(Request $request): JsonResponse
@@ -311,124 +331,144 @@ class EventController extends Controller
         ]);
     }
 
-
-
- /**
+    /**
      * @OA\Post(
      *     path="/api/events",
      *     summary="Create a new event",
+     *     description="Creates a new event with the provided data. Available tickets will be automatically set to total tickets.",
      *     tags={"Events"},
      *     security={{"bearerAuth":{}}},
      *     @OA\RequestBody(
      *         required=true,
+     *         description="Event data for creation",
      *         @OA\JsonContent(
      *             required={"name", "description", "start_date", "end_date", "location", "price", "total_tickets", "category_id"},
-     *             @OA\Property(property="name", type="string", example="Jazz Night"),
-     *             @OA\Property(property="description", type="string", example="Live jazz event"),
-     *             @OA\Property(property="image_url", type="string", format="url"),
-     *             @OA\Property(property="thumbnail_url", type="string", format="url"),
-     *             @OA\Property(property="start_date", type="string", format="date-time"),
-     *             @OA\Property(property="end_date", type="string", format="date-time"),
-     *             @OA\Property(property="location", type="string"),
-     *             @OA\Property(property="price", type="number", format="float"),
-     *             @OA\Property(property="total_tickets", type="integer"),
-     *             @OA\Property(property="category_id", type="integer")
+     *             @OA\Property(property="name", type="string", maxLength=255, example="Jazz Night"),
+     *             @OA\Property(property="description", type="string", example="Live jazz event with renowned artists"),
+     *             @OA\Property(property="image_url", type="string", format="url", nullable=true, example="https://example.com/image.jpg"),
+     *             @OA\Property(property="thumbnail_url", type="string", format="url", nullable=true, example="https://example.com/thumb.jpg"),
+     *             @OA\Property(property="start_date", type="string", format="date-time", example="2024-12-25 19:00:00"),
+     *             @OA\Property(property="end_date", type="string", format="date-time", example="2024-12-25 23:00:00"),
+     *             @OA\Property(property="location", type="string", maxLength=255, example="Belgrade Arena"),
+     *             @OA\Property(property="price", type="number", format="float", minimum=0, example=50.00),
+     *             @OA\Property(property="total_tickets", type="integer", minimum=1, example=500),
+     *             @OA\Property(property="category_id", type="integer", example=1),
+     *             @OA\Property(property="featured", type="boolean", example=false)
      *         )
      *     ),
-     *     @OA\Response(response=201, description="Event created successfully"),
-     *     @OA\Response(response=422, description="Validation error")
+     *     @OA\Response(
+     *         response=201,
+     *         description="Event created successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Event created successfully"),
+     *             @OA\Property(property="data", ref="#/components/schemas/EventResource")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validation error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="The given data was invalid."),
+     *             @OA\Property(property="errors", type="object")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Internal server error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Error creating event")
+     *         )
+     *     )
      * )
      */
     public function store(Request $request): JsonResponse
-{
-    $request->validate([
-        'name' => 'required|string|max:255',
-        'description' => 'required|string',
-        'image_url' => 'nullable|string',
-        'thumbnail_url' => 'nullable|string',
-        'start_date' => 'required|date',
-        'end_date' => 'required|date|after:start_date',
-        'location' => 'required|string|max:255',
-        'price' => 'required|numeric|min:0',
-        'total_tickets' => 'required|integer|min:1',
-        'category_id' => 'required|exists:categories,id',
-        'featured' => 'sometimes|boolean'
-    ]);
-
-
-    try {
-        $eventData = $request->only([
-            'name', 'description', 'image_url', 'thumbnail_url',
-            'start_date', 'end_date', 'location', 'price',
-            'total_tickets', 'category_id', 'featured'
+    {
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'description' => 'required|string',
+            'image_url' => 'nullable|string',
+            'thumbnail_url' => 'nullable|string',
+            'start_date' => 'required|date',
+            'end_date' => 'required|date|after:start_date',
+            'location' => 'required|string|max:255',
+            'price' => 'required|numeric|min:0',
+            'total_tickets' => 'required|integer|min:1',
+            'category_id' => 'required|exists:categories,id',
+            'featured' => 'sometimes|boolean'
         ]);
 
+        try {
+            $eventData = $request->only([
+                'name', 'description', 'image_url', 'thumbnail_url',
+                'start_date', 'end_date', 'location', 'price',
+                'total_tickets', 'category_id', 'featured'
+            ]);
 
-        $eventData['available_tickets'] = $eventData['total_tickets'];
+            $eventData['available_tickets'] = $eventData['total_tickets'];
 
+            $event = Event::create($eventData);
+            $event->load('category');
 
-        $event = Event::create($eventData);
-        $event->load('category');
+            return response()->json([
+                'success' => true,
+                'message' => 'Event created successfully',
+                'data' => new EventResource($event)
+            ], 201);
 
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Event created successfully',
-            'data' => new EventResource($event)
-        ], 201);
-
-
-    } catch (\Exception $e) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Error creating event: ' . $e->getMessage(),
-            'data' => null
-        ], 500);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error creating event: ' . $e->getMessage(),
+                'data' => null
+            ], 500);
+        }
     }
-}
 
     /**
      * @OA\Get(
-     * path="/api/events/{id}",
-     * summary="Get a single event by ID",
-     * tags={"Events"},
-     * @OA\Parameter(
-     * name="id",
-     * in="path",
-     * required=true,
-     * description="ID of the event to retrieve",
-     * @OA\Schema(type="integer")
-     * ),
-     * @OA\Response(
-     * response=200,
-     * description="Event retrieved successfully",
-     * @OA\JsonContent(
-     * @OA\Property(property="success", type="boolean", example=true),
-     * @OA\Property(property="message", type="string", example="Event retrieved successfully"),
-     * @OA\Property(property="data", ref="#/components/schemas/EventResource")
-     * )
-     * ),
-     * @OA\Response(
-     * response=404,
-     * description="Event not found",
-     * @OA\JsonContent(
-     * @OA\Property(property="success", type="boolean", example=false),
-     * @OA\Property(property="message", type="string", example="Event not found"),
-     * @OA\Property(property="data", type="null")
-     * )
-     * ),
-     * @OA\Response(
-     * response=500,
-     * description="Error retrieving event",
-     * @OA\JsonContent(
-     * @OA\Property(property="success", type="boolean", example=false),
-     * @OA\Property(property="message", type="string", example="Error retrieving event"),
-     * @OA\Property(property="data", type="null")
-     * )
-     * )
+     *     path="/api/events/{id}",
+     *     summary="Get a single event by ID",
+     *     description="Retrieves a specific event with its category and active tickets information",
+     *     tags={"Events"},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="ID of the event to retrieve",
+     *         @OA\Schema(type="string")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Event retrieved successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Event retrieved successfully"),
+     *             @OA\Property(property="data", ref="#/components/schemas/EventResource")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Event not found",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Event not found"),
+     *             @OA\Property(property="data", type="null")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Error retrieving event",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Error retrieving event"),
+     *             @OA\Property(property="data", type="null")
+     *         )
+     *     )
      * )
      */
-    // Updated show method in EventController
     public function show($id): JsonResponse
     {
         try {
@@ -456,53 +496,83 @@ class EventController extends Controller
         }
     }
  
-      /**
+    /**
      * @OA\Put(
-     * path="/api/events/{id}",
-     * operationId="updateEvent",
-     * tags={"Events"},
-     * summary="Ažuriranje postojećeg događaja",
-     * description="Ažurira podatke za događaj sa prosleđenim ID-jem. Sva polja su opciona.",
-     * @OA\Parameter(
-     * name="id",
-     * in="path",
-     * required=true,
-     * description="ID događaja za ažuriranje",
-     * @OA\Schema(type="string", format="uuid")
-     * ),
-     * @OA\RequestBody(
-     * required=true,
-     * description="Podaci za ažuriranje događaja",
-     * @OA\JsonContent(
-     * type="object",
-     * @OA\Property(property="name", type="string", example="Updated Tech Conference 2025"),
-     * @OA\Property(property="description", type="string", example="An updated description of the biggest tech conference in the region."),
-     * @OA\Property(property="image_url", type="string", format="uri", example="https://example.com/images/event_new.jpg"),
-     * @OA\Property(property="thumbnail_url", type="string", format="uri", example="https://example.com/images/event_thumb_new.jpg"),
-     * @OA\Property(property="start_date", type="string", format="date-time", example="2025-10-21 09:00:00"),
-     * @OA\Property(property="end_date", type="string", format="date-time", example="2025-10-22 17:00:00"),
-     * @OA\Property(property="location", type="string", example="Belgrade, Serbia"),
-     * @OA\Property(property="price", type="number", format="float", example=55.00),
-     * @OA\Property(property="total_tickets", type="integer", example=600),
-     * @OA\Property(property="category_id", type="string", format="uuid", example="9cde5f4d-6a56-4b13-9cf6-95333f24f86d"),
-     * @OA\Property(property="featured", type="boolean", example=false)
-     * )
-     * ),
-     * @OA\Response(
-     * response=200,
-     * description="Uspešno ažuriran događaj",
-     * @OA\JsonContent(
-     * @OA\Property(property="success", type="boolean", example=true),
-     * @OA\Property(property="message", type="string", example="Event updated successfully"),
-     * @OA\Property(property="data", ref="#/components/schemas/EventResource")
-     * )
-     * ),
-     * @OA\Response(response=404, description="Događaj nije pronađen"),
-     * @OA\Response(response=422, description="Greška pri validaciji (npr. ukupan broj karata je manji od prodatih)"),
-     * @OA\Response(response=500, description="Serverska greška")
+     *     path="/api/events/{id}",
+     *     operationId="updateEvent",
+     *     tags={"Events"},
+     *     summary="Update an existing event",
+     *     description="Updates an event with the provided ID. All fields are optional. When updating total_tickets, the system ensures it doesn't go below sold tickets count.",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="ID of the event to update",
+     *         @OA\Schema(type="string")
+     *     ),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         description="Event data for update (all fields optional)",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="name", type="string", maxLength=255, example="Updated Tech Conference 2025"),
+     *             @OA\Property(property="description", type="string", example="An updated description of the biggest tech conference in the region."),
+     *             @OA\Property(property="image_url", type="string", format="uri", maxLength=500, example="https://example.com/images/event_new.jpg"),
+     *             @OA\Property(property="thumbnail_url", type="string", format="uri", maxLength=500, example="https://example.com/images/event_thumb_new.jpg"),
+     *             @OA\Property(property="start_date", type="string", format="date-time", example="2025-10-21 09:00:00"),
+     *             @OA\Property(property="end_date", type="string", format="date-time", example="2025-10-22 17:00:00"),
+     *             @OA\Property(property="location", type="string", maxLength=255, example="Belgrade, Serbia"),
+     *             @OA\Property(property="price", type="number", format="float", minimum=0, example=55.00),
+     *             @OA\Property(property="total_tickets", type="integer", minimum=1, example=600),
+     *             @OA\Property(property="available_tickets", type="integer", minimum=0, example=550),
+     *             @OA\Property(property="category_id", type="string", example="9cde5f4d-6a56-4b13-9cf6-95333f24f86d"),
+     *             @OA\Property(property="featured", type="boolean", example=false)
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Event updated successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Event updated successfully"),
+     *             @OA\Property(property="data", ref="#/components/schemas/EventResource")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Event not found",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Event not found"),
+     *             @OA\Property(property="data", type="null")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validation error or business logic constraint",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Cannot reduce total tickets below sold tickets (50)"),
+     *             @OA\Property(property="errors", type="object",
+     *                 @OA\Property(property="total_tickets", type="array",
+     *                     @OA\Items(type="string", example="Total tickets cannot be less than sold tickets (50)")
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Internal server error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Error updating event"),
+     *             @OA\Property(property="data", type="null")
+     *         )
+     *     )
      * )
      */
-   public function update(Request $request, string $id): JsonResponse
+    public function update(Request $request, string $id): JsonResponse
     {
         try {
             $event = Event::findOrFail($id);
@@ -582,67 +652,66 @@ class EventController extends Controller
         }
     }
 
-
     /**
- * @OA\Delete(
- *     path="/api/events/{id}",
- *     summary="Delete an event",
- *     description="Deletes an event by ID. If the event has sold tickets (active or used), deletion will fail with a 422 response. If the event is currently active, a warning will be logged.",
- *     operationId="deleteEvent",
- *     tags={"Events"},
- *     security={{"sanctum":{}}},
- *     
- *     @OA\Parameter(
- *         name="id",
- *         in="path",
- *         description="ID of the event to delete",
- *         required=true,
- *         @OA\Schema(type="string")
- *     ),
- *     
- *     @OA\Response(
- *         response=200,
- *         description="Event deleted successfully",
- *         @OA\JsonContent(
- *             @OA\Property(property="success", type="boolean", example=true),
- *             @OA\Property(property="message", type="string", example="Event deleted successfully")
- *         )
- *     ),
- *     
- *     @OA\Response(
- *         response=404,
- *         description="Event not found",
- *         @OA\JsonContent(
- *             @OA\Property(property="success", type="boolean", example=false),
- *             @OA\Property(property="message", type="string", example="Event not found"),
- *             @OA\Property(property="data", type="string", nullable=true, example=null)
- *         )
- *     ),
- *     
- *     @OA\Response(
- *         response=422,
- *         description="Cannot delete event with sold tickets",
- *         @OA\JsonContent(
- *             @OA\Property(property="success", type="boolean", example=false),
- *             @OA\Property(property="message", type="string", example="Cannot delete event with sold tickets (5 tickets sold)"),
- *             @OA\Property(property="data", type="object",
- *                 @OA\Property(property="sold_tickets_count", type="integer", example=5),
- *                 @OA\Property(property="can_force_delete", type="boolean", example=false)
- *             )
- *         )
- *     ),
- *     
- *     @OA\Response(
- *         response=500,
- *         description="Error deleting event",
- *         @OA\JsonContent(
- *             @OA\Property(property="success", type="boolean", example=false),
- *             @OA\Property(property="message", type="string", example="Error deleting event"),
- *             @OA\Property(property="data", type="string", nullable=true, example=null)
- *         )
- *     )
- * )
- */
+     * @OA\Delete(
+     *     path="/api/events/{id}",
+     *     summary="Delete an event",
+     *     description="Deletes an event by ID. If the event has sold tickets (active or used), deletion will fail with a 422 response. If the event is currently active, a warning will be logged.",
+     *     operationId="deleteEvent",
+     *     tags={"Events"},
+     *     security={{"bearerAuth":{}}},
+     *     
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         description="ID of the event to delete",
+     *         required=true,
+     *         @OA\Schema(type="string")
+     *     ),
+     *     
+     *     @OA\Response(
+     *         response=200,
+     *         description="Event deleted successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Event deleted successfully")
+     *         )
+     *     ),
+     *     
+     *     @OA\Response(
+     *         response=404,
+     *         description="Event not found",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Event not found"),
+     *             @OA\Property(property="data", type="string", nullable=true, example=null)
+     *         )
+     *     ),
+     *     
+     *     @OA\Response(
+     *         response=422,
+     *         description="Cannot delete event with sold tickets",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Cannot delete event with sold tickets (5 tickets sold)"),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="sold_tickets_count", type="integer", example=5),
+     *                 @OA\Property(property="can_force_delete", type="boolean", example=false)
+     *             )
+     *         )
+     *     ),
+     *     
+     *     @OA\Response(
+     *         response=500,
+     *         description="Error deleting event",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Error deleting event"),
+     *             @OA\Property(property="data", type="string", nullable=true, example=null)
+     *         )
+     *     )
+     * )
+     */
     public function destroy(string $id): JsonResponse
     {
         try {
@@ -703,19 +772,40 @@ class EventController extends Controller
         }
     }
 
-
     /**
      * @OA\Get(
      *     path="/api/categories/{categoryId}/events",
      *     summary="Get events by category",
+     *     description="Retrieves all events belonging to a specific category, ordered by start date",
      *     tags={"Events"},
      *     @OA\Parameter(
      *         name="categoryId",
      *         in="path",
      *         required=true,
+     *         description="ID of the category to get events for",
      *         @OA\Schema(type="integer")
      *     ),
-     *     @OA\Response(response=200, description="Events for the category")
+     *     @OA\Response(
+     *         response=200,
+     *         description="Events for the category retrieved successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="category", type="object",
+     *                 @OA\Property(property="id", type="integer", example=1),
+     *                 @OA\Property(property="name", type="string", example="Music"),
+     *                 @OA\Property(property="description", type="string", example="Music events and concerts")
+     *             ),
+     *             @OA\Property(property="events", type="array",
+     *                 @OA\Items(ref="#/components/schemas/EventResource")
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Category not found",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="No query results for model [App\\Models\\Category]")
+     *         )
+     *     )
      * )
      */
     public function getEventsByCategory($categoryId): JsonResponse
@@ -732,19 +822,61 @@ class EventController extends Controller
         ]);
     }
 
-        /**
+    /**
      * @OA\Get(
      *     path="/api/events/{id}/tickets",
-     *     summary="Get tickets info for an event",
+     *     summary="Get tickets information for an event",
+     *     description="Retrieves detailed ticket information for a specific event including sold, available, and total tickets with user details",
      *     tags={"Events"},
+     *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
      *         required=true,
-     *         @OA\Schema(type="integer")
+     *         description="ID of the event to get ticket information for",
+     *         @OA\Schema(type="string")
      *     ),
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Response(response=200, description="Ticket info returned")
+     *     @OA\Response(
+     *         response=200,
+     *         description="Ticket information retrieved successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="event", type="object",
+     *                 @OA\Property(property="id", type="string", example="1"),
+     *                 @OA\Property(property="name", type="string", example="Jazz Night"),
+     *                 @OA\Property(property="start_date", type="string", format="date-time"),
+     *                 @OA\Property(property="end_date", type="string", format="date-time")
+     *             ),
+     *             @OA\Property(property="total_tickets", type="integer", example=500),
+     *             @OA\Property(property="sold_tickets", type="integer", example=150),
+     *             @OA\Property(property="available_tickets", type="integer", example=350),
+     *             @OA\Property(property="tickets", type="array",
+     *                 @OA\Items(type="object",
+     *                     @OA\Property(property="id", type="string"),
+     *                     @OA\Property(property="status", type="string", enum={"active", "used", "cancelled"}),
+     *                     @OA\Property(property="purchase_date", type="string", format="date-time"),
+     *                     @OA\Property(property="user", type="object",
+     *                         @OA\Property(property="id", type="string"),
+     *                         @OA\Property(property="name", type="string"),
+     *                         @OA\Property(property="email", type="string")
+     *                     )
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Event not found",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="No query results for model [App\\Models\\Event]")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Unauthorized",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Unauthenticated.")
+     *         )
+     *     )
      * )
      */
     public function getEventTickets($id): JsonResponse
@@ -760,55 +892,116 @@ class EventController extends Controller
         ]);
     }
 
+    /**
+     * @OA\Post(
+     *     path="/api/events/upload-image",
+     *     summary="Upload an image for an event",
+     *     description="Uploads an image file for an event (main image or thumbnail) and returns the URL",
+     *     tags={"Events"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\MediaType(
+     *             mediaType="multipart/form-data",
+     *             @OA\Schema(
+     *                 @OA\Property(
+     *                     property="image",
+     *                     type="string",
+     *                     format="binary",
+     *                     description="Image file (jpeg, png, jpg, gif - max 5MB)"
+     *                 ),
+     *                 @OA\Property(
+     *                     property="type",
+     *                     type="string",
+     *                     enum={"main", "thumbnail"},
+     *                     description="Type of image being uploaded",
+     *                     example="main"
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Image uploaded successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Image uploaded successfully"),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="url", type="string", format="url", example="https://example.com/storage/events/1234567890_main_abcdef1234.jpg"),
+     *                 @OA\Property(property="path", type="string", example="events/1234567890_main_abcdef1234.jpg"),
+     *                 @OA\Property(property="filename", type="string", example="1234567890_main_abcdef1234.jpg"),
+     *                 @OA\Property(property="type", type="string", example="main")
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validation error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="The given data was invalid."),
+     *             @OA\Property(property="errors", type="object",
+     *                 @OA\Property(property="image", type="array",
+     *                     @OA\Items(type="string", example="The image must be a file of type: jpeg, png, jpg, gif.")
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Error uploading image",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Error uploading image"),
+     *             @OA\Property(property="data", type="null")
+     *         )
+     *     )
+     * )
+     */
     public function uploadImage(Request $request): JsonResponse
-{
-    $request->validate([
-        'image' => 'required|image|mimes:jpeg,png,jpg,gif|max:5120', // 5MB max
-        'type' => 'required|in:main,thumbnail'
-    ]);
-
-
-    try {
-        $image = $request->file('image');
-        $type = $request->get('type', 'main');
-        
-        // Generate unique filename
-        $filename = time() . '_' . $type . '_' . Str::random(10) . '.' . $image->getClientOriginalExtension();
-        
-        // Store in public/storage/events directory
-        $path = $image->storeAs('events', $filename, 'public');
-        
-        // Generate full URL
-        $imageUrl = asset('storage/' . $path);
-        
-        return response()->json([
-            'success' => true,
-            'message' => 'Image uploaded successfully',
-            'data' => [
-                'url' => $imageUrl,
-                'path' => $path,
-                'filename' => $filename,
-                'type' => $type
-            ]
+    {
+        $request->validate([
+            'image' => 'required|image|mimes:jpeg,png,jpg,gif|max:5120', // 5MB max
+            'type' => 'required|in:main,thumbnail'
         ]);
 
+        try {
+            $image = $request->file('image');
+            $type = $request->get('type', 'main');
+            
+            // Generate unique filename
+            $filename = time() . '_' . $type . '_' . Str::random(10) . '.' . $image->getClientOriginalExtension();
+            
+            // Store in public/storage/events directory
+            $path = $image->storeAs('events', $filename, 'public');
+            
+            // Generate full URL
+            $imageUrl = asset('storage/' . $path);
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Image uploaded successfully',
+                'data' => [
+                    'url' => $imageUrl,
+                    'path' => $path,
+                    'filename' => $filename,
+                    'type' => $type
+                ]
+            ]);
 
-    } catch (\Exception $e) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Error uploading image: ' . $e->getMessage(),
-            'data' => null
-        ], 500);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error uploading image: ' . $e->getMessage(),
+                'data' => null
+            ], 500);
+        }
     }
 
-    
-
-}
-
-/**
+    /**
      * @OA\Get(
      *     path="/api/events/export",
      *     summary="Export events to CSV or HTML format",
+     *     description="Exports all events data to CSV or HTML format. Requires admin privileges. CSV includes UTF-8 BOM for Excel compatibility.",
      *     tags={"Events"},
      *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
@@ -820,14 +1013,39 @@ class EventController extends Controller
      *     ),
      *     @OA\Response(
      *         response=200,
-     *         description="File download",
+     *         description="File download initiated",
      *         @OA\MediaType(
      *             mediaType="text/csv",
      *             @OA\Schema(type="string", format="binary")
+     *         ),
+     *         @OA\MediaType(
+     *             mediaType="text/html",
+     *             @OA\Schema(type="string", format="binary")
      *         )
      *     ),
-     *     @OA\Response(response=403, description="Unauthorized - Admin access required"),
-     *     @OA\Response(response=400, description="Unsupported format")
+     *     @OA\Response(
+     *         response=403,
+     *         description="Unauthorized - Admin access required",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Unauthorized. Admin access required.")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=400,
+     *         description="Unsupported format",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Unsupported format. Use csv or html.")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Unauthenticated",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Unauthenticated.")
+     *         )
+     *     )
      * )
      */
     public function exportEvents(Request $request)

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useAuth } from "../../../context/AuthContext";
 import Button from "../Button";
 import InputField from "../InputField";
+import apiService from "../../../services/api";
 
 const UserProfile = () => {
   const { user, updateUser } = useAuth();
@@ -12,6 +13,7 @@ const UserProfile = () => {
     email: user?.email || "",
   });
   const [errors, setErrors] = useState({});
+  const [success, setSuccess] = useState(""); // DODAJTE SUCCESS STATE
 
   const handleChange = (e) => {
     setFormData({
@@ -25,6 +27,7 @@ const UserProfile = () => {
         [e.target.name]: "",
       });
     }
+    setSuccess(""); // Clear success message
   };
 
   const handleEdit = () => {
@@ -33,6 +36,8 @@ const UserProfile = () => {
       name: user?.name || "",
       email: user?.email || "",
     });
+    setErrors({});
+    setSuccess("");
   };
 
   const handleCancel = () => {
@@ -42,6 +47,7 @@ const UserProfile = () => {
       email: user?.email || "",
     });
     setErrors({});
+    setSuccess("");
   };
 
   const validateForm = () => {
@@ -69,17 +75,32 @@ const UserProfile = () => {
 
     setLoading(true);
     setErrors({});
+    setSuccess("");
 
     try {
-      // Simulate API call to update user profile
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // POZOVITE STVARNI API
+      const response = await apiService.updateUserProfile(formData);
 
-      // Update user in context
-      updateUser(formData);
-
-      setIsEditing(false);
+      if (response.success) {
+        // Update user in context
+        updateUser(response.data);
+        setSuccess("Profil je uspešno ažuriran");
+        setIsEditing(false);
+      } else {
+        setErrors({
+          general: response.message || "Greška pri ažuriranju profila",
+        });
+      }
     } catch (error) {
-      setErrors({ general: "Greška pri ažuriranju profila" });
+      console.error("Profile update error:", error);
+
+      if (error.errors) {
+        setErrors(error.errors);
+      } else {
+        setErrors({
+          general: error.message || "Greška pri ažuriranju profila",
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -111,6 +132,22 @@ const UserProfile = () => {
         )}
       </div>
 
+      {/* SUCCESS MESSAGE */}
+      {success && (
+        <div
+          style={{
+            color: "green",
+            marginBottom: "1rem",
+            padding: "0.5rem",
+            backgroundColor: "#efe",
+            border: "1px solid #cfc",
+            borderRadius: "4px",
+          }}
+        >
+          {success}
+        </div>
+      )}
+
       {errors.general && (
         <div
           style={{
@@ -126,6 +163,7 @@ const UserProfile = () => {
         </div>
       )}
 
+      {/* OSTATAK KOMPONENTE OSTAJE ISTI */}
       {isEditing ? (
         <div>
           <InputField

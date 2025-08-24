@@ -60,6 +60,10 @@ Route::middleware(['api.errors', 'api.response'])->group(function () {
         Route::post('refresh', [AuthController::class, 'refresh']);
         Route::get('user', [AuthController::class, 'user']);
 
+        //Update user
+        Route::put('user/profile', [AuthController::class, 'updateProfile']);
+        Route::put('user/password', [AuthController::class, 'changePassword']);
+
         // Admin routes
         Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function () {
             Route::get('dashboard/overview', [AdminDashboardController::class, 'getOverviewStats']);
@@ -69,9 +73,7 @@ Route::middleware(['api.errors', 'api.response'])->group(function () {
             Route::get('dashboard/recent-activity', [AdminDashboardController::class, 'getRecentActivity']);
             Route::get('dashboard/upcoming-events', [AdminDashboardController::class, 'getUpcomingEvents']);
 
-
-
-            // Admin queue management - DODAJ OVE RUTE
+            // Admin queue management
             Route::prefix('queue')->group(function () {
             Route::post('enable', [QueueController::class, 'enableQueue']);
             Route::post('disable', [QueueController::class, 'disableQueue']);
@@ -80,7 +82,7 @@ Route::middleware(['api.errors', 'api.response'])->group(function () {
             Route::delete('clear-waiting', [QueueController::class, 'clearWaitingQueue']);
             Route::delete('clear-expired', [QueueController::class, 'clearExpiredSessions']);
             Route::post('activate-next', [QueueController::class, 'activateNextInQueue']);
-    });
+            });
         });
 
         // Events - CRUD operations for authenticated users

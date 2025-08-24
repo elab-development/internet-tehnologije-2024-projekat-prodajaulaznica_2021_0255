@@ -508,6 +508,15 @@ export const apiService = {
     const response = await api.post("/admin/queue/activate-next");
     return response;
   },
+
+  // User profile management
+  updateUserProfile: async (profileData) => {
+    return await api.put("/user/profile", profileData);
+  },
+
+  changeUserPassword: async (passwordData) => {
+    return await api.put("/user/password", passwordData);
+  },
 };
 
 export default apiService;

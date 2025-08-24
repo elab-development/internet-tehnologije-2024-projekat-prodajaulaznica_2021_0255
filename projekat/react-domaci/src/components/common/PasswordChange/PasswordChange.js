@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import Button from "../Button";
 import InputField from "../InputField";
+import apiService from "../../../services/api";
 
 const PasswordChange = () => {
   const [isChanging, setIsChanging] = useState(false);
@@ -59,20 +60,32 @@ const PasswordChange = () => {
 
     setLoading(true);
     setErrors({});
+    setSuccess("");
 
     try {
-      // Simulate API call to change password
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      const response = await apiService.changeUserPassword(formData);
 
-      setSuccess("Lozinka je uspešno promenjena");
-      setFormData({
-        current_password: "",
-        new_password: "",
-        new_password_confirmation: "",
-      });
-      setIsChanging(false);
+      if (response.success) {
+        setSuccess("Lozinka je uspešno promenjena");
+        setFormData({
+          current_password: "",
+          new_password: "",
+          new_password_confirmation: "",
+        });
+        setIsChanging(false);
+      } else {
+        setErrors({
+          general: response.message || "Greška pri promeni lozinke",
+        });
+      }
     } catch (error) {
-      setErrors({ general: "Greška pri promeni lozinke" });
+      console.error("Password change error:", error);
+
+      if (error.errors) {
+        setErrors(error.errors);
+      } else {
+        setErrors({ general: error.message || "Greška pri promeni lozinke" });
+      }
     } finally {
       setLoading(false);
     }

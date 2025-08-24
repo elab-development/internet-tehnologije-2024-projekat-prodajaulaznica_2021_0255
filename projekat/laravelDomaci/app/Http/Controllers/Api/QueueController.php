@@ -156,49 +156,44 @@ class QueueController extends Controller
         });
     }
 
-    /**
-     * @OA\Get(
-     *     path="/api/queue/status",
-     *     summary="Check current queue status",
-     *     description="Retrieves the current status of the user in the queue system, including position, wait time, and access permissions.",
-     *     operationId="checkQueueStatus",
-     *     tags={"Queue Management"},
-     *     security={{"bearerAuth": {}}},
-     *     @OA\Response(
-     *         response=200,
-     *         description="Queue status retrieved successfully",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Queue status retrieved"),
-     *             @OA\Property(
-     *                 property="data",
-     *                 type="object",
-     *                 @OA\Property(property="status", type="string", enum={"active", "waiting", "not_in_queue"}, example="waiting"),
-     *                 @OA\Property(property="can_access", type="boolean", example=false),
-     *                 @OA\Property(property="position", type="integer", example=5),
-     *                 @OA\Property(property="estimated_wait_time", type="integer", example=10, description="Estimated wait time in minutes"),
-     *                 @OA\Property(property="expires_at", type="string", format="date-time", example="2024-01-01T15:30:00Z"),
-     *                 @OA\Property(property="total_waiting", type="integer", example=25),
-     *                 @OA\Property(property="total_active", type="integer", example=100)
-     *             )
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="User not in queue",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Not in queue"),
-     *             @OA\Property(
-     *                 property="data",
-     *                 type="object",
-     *                 @OA\Property(property="status", type="string", example="not_in_queue"),
-     *                 @OA\Property(property="can_access", type="boolean", example=true)
-     *             )
-     *         )
-     *     )
-     * )
-     */
+   /**
+ * @OA\Get(
+ *     path="/api/queue/status",
+ *     summary="Check current queue status",
+ *     description="Retrieves the current status of the user in the queue system, including position, wait time, and access permissions.",
+ *     operationId="checkQueueStatus",
+ *     tags={"Queue Management"},
+ *     security={{"bearerAuth": {}}},
+ *     @OA\Response(
+ *         response=200,
+ *         description="Queue status response",
+ *         @OA\JsonContent(
+ *             @OA\Property(property="success", type="boolean", example=true, description="True if user is in queue, false otherwise"),
+ *             @OA\Property(property="message", type="string", example="Queue status retrieved"),
+ *             @OA\Property(
+ *                 property="data",
+ *                 type="object",
+ *                 @OA\Property(property="status", type="string", enum={"active", "waiting", "not_in_queue"}, example="waiting", description="Current queue status"),
+ *                 @OA\Property(property="can_access", type="boolean", example=false, description="Whether the user can access the resource now"),
+ *                 @OA\Property(property="position", type="integer", example=5, description="User's position in the queue, if applicable"),
+ *                 @OA\Property(property="estimated_wait_time", type="integer", example=10, description="Estimated wait time in minutes"),
+ *                 @OA\Property(property="expires_at", type="string", format="date-time", example="2024-01-01T15:30:00Z", description="Time when access expires"),
+ *                 @OA\Property(property="total_waiting", type="integer", example=25, description="Total number of users waiting"),
+ *                 @OA\Property(property="total_active", type="integer", example=100, description="Total number of active users")
+ *             )
+ *         )
+ *     ),
+ *     @OA\Response(
+ *         response=400,
+ *         description="Bad request",
+ *         @OA\JsonContent(
+ *             @OA\Property(property="success", type="boolean", example=false),
+ *             @OA\Property(property="message", type="string", example="Invalid request")
+ *         )
+ *     )
+ * )
+ */
+
     public function checkQueueStatus(Request $request): JsonResponse
     {
          $sessionId = $request->session()->getId();

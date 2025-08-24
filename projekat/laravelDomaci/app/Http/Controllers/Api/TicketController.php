@@ -280,51 +280,69 @@ class TicketController extends Controller
         }
     }
 
-    /**
-     * @OA\Post(
-     *     path="/api/tickets/validate-qr",
-     *     summary="Validate QR code data",
-     *     description="Validate a ticket using QR code data",
-     *     operationId="validateQRCode",
-     *     tags={"Tickets"},
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             required={"qr_data"},
-     *             @OA\Property(property="qr_data", type="string", description="JSON string from QR code", example="{\"ticket_number\":\"TKT-ABC12345\",\"event_id\":1}")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="QR code validation result",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Valid ticket"),
-     *             @OA\Property(property="valid", type="boolean", example=true),
-     *             @OA\Property(property="data", ref="#/components/schemas/TicketResource"),
-     *             @OA\Property(property="qr_data", type="object", description="Decoded QR data")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=400,
-     *         description="Invalid QR code format",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Invalid QR code format"),
-     *             @OA\Property(property="valid", type="boolean", example=false)
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=404,
-     *         description="Ticket not found",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Ticket not found"),
-     *             @OA\Property(property="valid", type="boolean", example=false)
-     *         )
-     *     )
-     * )
-     */
+/**
+ * @OA\Post(
+ *     path="/api/tickets/validate-qr",
+ *     summary="Validate QR code data",
+ *     description="Validate a ticket using QR code data",
+ *     operationId="validateQRCode",
+ *     tags={"Tickets"},
+ *     @OA\RequestBody(
+ *         required=true,
+ *         @OA\JsonContent(
+ *             required={"qr_data"},
+ *             @OA\Property(
+ *                 property="qr_data",
+ *                 type="object",
+ *                 description="JSON data extracted from QR code",
+ *                 @OA\Property(
+ *                     property="ticket_number",
+ *                     type="string",
+ *                     example="TKT-ABC12345"
+ *                 ),
+ *                 @OA\Property(
+ *                     property="event_id",
+ *                     type="integer",
+ *                     example=1
+ *                 )
+ *             )
+ *         )
+ *     ),
+ *     @OA\Response(
+ *         response=200,
+ *         description="QR code validation result",
+ *         @OA\JsonContent(
+ *             @OA\Property(property="success", type="boolean", example=true),
+ *             @OA\Property(property="message", type="string", example="Valid ticket"),
+ *             @OA\Property(property="valid", type="boolean", example=true),
+ *             @OA\Property(property="data", ref="#/components/schemas/TicketResource"),
+ *             @OA\Property(
+ *                 property="qr_data",
+ *                 type="object",
+ *                 description="Decoded QR data"
+ *             )
+ *         )
+ *     ),
+ *     @OA\Response(
+ *         response=400,
+ *         description="Invalid QR code format",
+ *         @OA\JsonContent(
+ *             @OA\Property(property="success", type="boolean", example=false),
+ *             @OA\Property(property="message", type="string", example="Invalid QR code format"),
+ *             @OA\Property(property="valid", type="boolean", example=false)
+ *         )
+ *     ),
+ *     @OA\Response(
+ *         response=404,
+ *         description="Ticket not found",
+ *         @OA\JsonContent(
+ *             @OA\Property(property="success", type="boolean", example=false),
+ *             @OA\Property(property="message", type="string", example="Ticket not found"),
+ *             @OA\Property(property="valid", type="boolean", example=false)
+ *         )
+ *     )
+ * )
+ */
     public function validateQRCode(Request $request): JsonResponse
     {
         $request->validate([
